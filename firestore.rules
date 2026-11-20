@@ -4,20 +4,11 @@ rules_version = '2';
 // Publicar en Firebase Console → Firestore → Reglas (proyecto fica-tostadores).
 service cloud.firestore {
   match /databases/{database}/documents {
-    function callerDoc() {
-      return get(/databases/$(database)/documents/clientes/$(request.auth.uid));
-    }
-
+    // El rol del equipo vive únicamente en `staff` (solo Admin SDK).
     function callerRole() {
-      return callerDoc().data.role;
-    }
-
-    function isSuperAdmin() {
-      return request.auth != null && callerRole() == 'admin';
-    }
-
-    function isValidRole(role) {
-      return role in ['cliente', 'editor', 'admin'];
+      return exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role
+        : null;
     }
 
     function isStaff() {
@@ -25,28 +16,32 @@ service cloud.firestore {
     }
 
     match /clientes/{userId} {
-      allow read: if request.auth != null
-        && (request.auth.uid == userId || isSuperAdmin());
+      // Cada usuario solo puede leer su propio perfil.
+      // El panel admin accede vía Admin SDK (no por estas reglas).
+      allow read: if request.auth != null && request.auth.uid == userId;
 
+      // `clientes` solo guarda el perfil de despacho. Los roles viven en `staff`.
       allow create: if request.auth != null
         && request.auth.uid == userId
-        && request.resource.data.role == 'cliente';
+        && (
+          !request.resource.data.keys().hasAny(['role'])
+          || request.resource.data.role == 'cliente'
+        );
 
-      allow update: if request.auth != null && (
-        (
-          request.auth.uid == userId
-          && request.resource.data.role == resource.data.role
-        ) || (
-          isSuperAdmin()
-          && request.auth.uid != userId
-          && isValidRole(request.resource.data.role)
-          && request.resource.data.role is string
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.email == resource.data.email
-        )
-      );
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.get('role', null) == resource.data.get('role', null);
 
       allow delete: if false;
+    }
+
+    // Equipo y sus invitaciones: acceso exclusivo vía Admin SDK.
+    match /staff/{userId} {
+      allow read, write: if false;
+    }
+
+    match /staff_invitaciones/{invitacionId} {
+      allow read, write: if false;
     }
 
     // Solicitudes desde la web pública (creación vía Admin SDK).
@@ -73,6 +68,12 @@ service cloud.firestore {
     match /catalogo_config/{docId} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // Operadores de revisión: solo accesibles vía Admin SDK (API admin/electron).
+    // El PIN nunca se expone al cliente.
+    match /operadores/{operadorId} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

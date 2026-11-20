@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
+import type { Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { isLocalDevMode } from "@/lib/local-dev/mode";
 
 let cachedApp: App | null | undefined;
 
@@ -42,8 +44,17 @@ function parseServiceAccountFromPath(): Record<string, unknown> | null {
   }
 }
 
+let cachedServiceAccount: Record<string, unknown> | null | undefined;
+
 function parseServiceAccountJson(): Record<string, unknown> | null {
-  return parseServiceAccountFromEnvJson() ?? parseServiceAccountFromPath();
+  if (cachedServiceAccount !== undefined) {
+    return cachedServiceAccount;
+  }
+
+  cachedServiceAccount =
+    parseServiceAccountFromEnvJson() ?? parseServiceAccountFromPath();
+
+  return cachedServiceAccount;
 }
 
 export function isFirebaseAdminConfigured(): boolean {
@@ -51,6 +62,10 @@ export function isFirebaseAdminConfigured(): boolean {
 }
 
 export function getFirebaseAdminApp(): App | null {
+  if (isLocalDevMode()) {
+    return null;
+  }
+
   if (cachedApp !== undefined) {
     return cachedApp;
   }
@@ -84,4 +99,20 @@ export function getFirebaseAdminFirestore(): Firestore | null {
   }
 
   return getFirestore(app);
+}
+
+/**
+ * Carga `firebase-admin/auth` de forma diferida: importarlo a nivel de módulo
+ * hace que todas las rutas que solo usan Firestore intenten cargar jwks-rsa y
+ * fallen en el runtime de Vercel (require de jose ESM).
+ */
+export async function getFirebaseAdminAuth(): Promise<Auth | null> {
+  const app = getFirebaseAdminApp();
+
+  if (!app) {
+    return null;
+  }
+
+  const { getAuth } = await import("firebase-admin/auth");
+  return getAuth(app);
 }

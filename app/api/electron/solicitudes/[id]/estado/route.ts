@@ -5,9 +5,14 @@ import {
 } from "@/lib/electron-presence";
 import { electronJson, electronOptionsResponse } from "@/lib/electron-cors";
 import { getFirebaseAdminFirestore } from "@/lib/firebase-admin";
+import { bumpSolicitudesVersion } from "@/lib/solicitudes-sync";
 import { SOLICITUDES_COTIZACION_COLLECTION } from "@/lib/cotizaciones/constants";
 import { SOLICITUDES_SOPORTE_TECNICO_COLLECTION } from "@/lib/soporte-tecnico/constants";
-import { FieldValue } from "firebase-admin/firestore";
+import {
+  esModoSimulacion,
+  obtenerProximoFolioOtEnTransaccion,
+} from "@/lib/cotizaciones/folio";
+import { FieldValue, type DocumentData, type DocumentReference } from "firebase-admin/firestore";
 
 /**
  * PATCH /api/electron/solicitudes/[id]/estado
@@ -127,6 +132,7 @@ export async function PATCH(
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let docRef: any = null;
+    let existingData: Record<string, unknown> | null = null;
 
     for (const collectionName of COLLECTIONS) {
       const ref = db.collection(collectionName).doc(id);
@@ -134,7 +140,26 @@ export async function PATCH(
 
       if (snapshot.exists) {
         docRef = ref;
+        existingData = snapshot.data() ?? null;
         break;
+      }
+    }
+
+    // En modo simulación el folio visible (CO 03240) no es el id del documento:
+    // resolver por el campo `id` como respaldo, en ambas colecciones.
+    if (!docRef) {
+      for (const collectionName of COLLECTIONS) {
+        const byIdField = await db
+          .collection(collectionName)
+          .where("id", "==", id)
+          .limit(1)
+          .get();
+
+        if (!byIdField.empty) {
+          docRef = byIdField.docs[0].ref;
+          existingData = byIdField.docs[0].data() ?? null;
+          break;
+        }
       }
     }
 
@@ -178,7 +203,38 @@ export async function PATCH(
       update.produccionEtapaLabel = ESTADO_LABELS[estado];
     }
 
+    const esDocumentoCotizacion =
+      docRef.parent?.id === SOLICITUDES_COTIZACION_COLLECTION;
+    const debeAsignarFolioOt =
+      esDocumentoCotizacion &&
+      update.enOT === true &&
+      !(typeof existingData?.folioOt === "string" && existingData.folioOt.trim());
+
+    if (debeAsignarFolioOt) {
+      const simulation = await esModoSimulacion(db);
+
+      let folioOt = "";
+
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(docRef as DocumentReference);
+        const data = (fresh.data() ?? {}) as Record<string, unknown>;
+        const patch: Record<string, unknown> = { ...update };
+
+        if (!(typeof data.folioOt === "string" && data.folioOt.trim())) {
+          folioOt = await obtenerProximoFolioOtEnTransaccion(tx, db, simulation);
+          patch.folioOt = folioOt;
+        }
+
+        tx.update(docRef as DocumentReference, patch as DocumentData);
+      });
+
+      await bumpSolicitudesVersion(db);
+
+      return electronJson({ ok: true, id, estado, folioOt: folioOt || null });
+    }
+
     await docRef.update(update);
+    await bumpSolicitudesVersion(db);
 
     return electronJson({ ok: true, id, estado });
   } catch (error) {

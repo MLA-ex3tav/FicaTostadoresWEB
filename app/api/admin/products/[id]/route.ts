@@ -4,7 +4,7 @@ import { canPersistProducts } from "@/lib/products-repository";
 import { FIREBASE_ADMIN_NOT_CONFIGURED_MESSAGE } from "@/lib/firebase-admin-config";
 import {
   deleteProduct,
-  getProductById,
+  getAdminProductById,
   updateProduct,
 } from "@/lib/products-server";
 import { revalidateProductPages } from "@/lib/revalidate-products";
@@ -39,7 +39,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return validationErrorResponse(error);
   }
 
-  const product = await getProductById(id);
+  const product = await getAdminProductById(id);
 
   if (!product) {
     return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });

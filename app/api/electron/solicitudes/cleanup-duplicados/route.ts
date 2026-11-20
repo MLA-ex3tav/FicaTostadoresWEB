@@ -5,6 +5,7 @@ import {
 } from "@/lib/electron-presence";
 import { electronJson, electronOptionsResponse } from "@/lib/electron-cors";
 import { getFirebaseAdminFirestore } from "@/lib/firebase-admin";
+import { bumpSolicitudesVersion } from "@/lib/solicitudes-sync";
 import { SOLICITUDES_COTIZACION_COLLECTION } from "@/lib/cotizaciones/constants";
 
 /**
@@ -190,6 +191,7 @@ export async function POST(request: Request) {
       }
 
       await Promise.all(batches);
+      await bumpSolicitudesVersion(db);
     }
 
     return electronJson({

@@ -20,9 +20,9 @@ export const DEFAULT_IMAGE_FOCUS: ProductImageFocus = { x: 50, y: 50 };
 /** Punto de encuadre por defecto para carrusel (centrado). */
 export const CAROUSEL_DEFAULT_FOCUS: ProductImageFocus = { x: 50, y: 50 };
 
-/** Contenedor del carrusel: proporción 5:2 a ancho completo. */
+/** Contenedor del carrusel: proporción 5:2 en desktop, 4:3 en móvil. */
 export const CAROUSEL_CONTAINER_CLASS =
-  "relative w-full aspect-[5/2] min-h-[15rem]";
+  "relative w-full aspect-[4/3] sm:aspect-[5/2] min-h-[17rem] sm:min-h-[15rem]";
 
 export const CAROUSEL_IMAGE_SPEC = {
   label: "Vista carrusel",

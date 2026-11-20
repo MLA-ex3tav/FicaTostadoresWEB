@@ -230,7 +230,7 @@ export default function CustomSelect({
           left: menuPosition.left,
           width: menuPosition.width,
         }}
-        className="z-[120] overflow-hidden rounded-xl border border-steel-dark/30 bg-[var(--input-bg)] shadow-xl"
+        className="z-[120] overflow-hidden rounded-xl border border-orange/30 bg-[#121519]/95 backdrop-blur-xl shadow-2xl"
         onKeyDown={handleListKeyDown}
       >
         {showSearch ? (
@@ -249,7 +249,7 @@ export default function CustomSelect({
                   setHighlightIndex(0);
                 }}
                 placeholder="Buscar…"
-                className="w-full rounded-lg border border-steel-dark/25 bg-background/60 py-2 pl-9 pr-3 text-sm text-steel-light placeholder:text-steel-dark focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+                className="w-full rounded-lg border border-white/[0.08] bg-white/[0.02] py-2 pl-9 pr-3 text-sm text-steel-light placeholder:text-steel-dark focus:border-orange/60 focus:outline-none focus:ring-1 focus:ring-orange/30"
                 aria-label="Buscar opciones"
               />
             </div>
@@ -260,7 +260,7 @@ export default function CustomSelect({
           id={listId}
           role="listbox"
           aria-label={ariaLabel ?? "Opciones"}
-          className="max-h-64 overflow-y-auto py-1"
+          className="max-h-64 space-y-1 overflow-y-auto px-1 py-1"
         >
           {filteredOptions.length === 0 ? (
             <li className="px-4 py-3 text-sm text-steel-dark">
@@ -279,10 +279,10 @@ export default function CustomSelect({
                     aria-selected={isSelected}
                     onMouseEnter={() => setHighlightIndex(index)}
                     onClick={() => selectValue(option.value)}
-                    className={`flex w-full items-center px-3 py-2.5 text-left text-sm transition-colors ${
+                    className={`flex w-full items-center rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors ${
                       isHighlighted || isSelected
-                        ? "bg-orange/15 text-steel-light"
-                        : "text-steel-mid hover:bg-panel/80 hover:text-steel-light"
+                        ? "bg-white/[0.08] text-orange font-medium"
+                        : "text-steel-mid hover:bg-white/[0.06] hover:text-orange"
                     }`}
                   >
                     <span className="min-w-0 flex-1 truncate">{option.label}</span>
@@ -313,7 +313,7 @@ export default function CustomSelect({
         aria-label={ariaLabel ?? triggerLabel}
         onClick={() => (open ? closeMenu() : openMenu())}
         onKeyDown={handleTriggerKeyDown}
-        className="flex h-12 w-full items-center justify-between gap-2 rounded-xl border border-steel-dark/25 bg-[var(--input-bg)] px-3 text-sm text-steel-light transition-colors hover:border-steel-mid/50 focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-12 w-full items-center justify-between gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 text-sm text-steel-light transition-colors hover:border-orange/40 focus:border-orange/60 focus:outline-none focus:ring-1 focus:ring-orange/30 aria-expanded:border-orange/60 aria-expanded:ring-1 aria-expanded:ring-orange/30 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span
           className={`min-w-0 flex-1 truncate text-left ${selectedOption ? "text-steel-light" : "text-steel-mid"}`}

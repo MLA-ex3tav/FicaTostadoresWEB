@@ -161,9 +161,6 @@ export default function CategoryAdminPanel() {
     await saveConfig(nextConfig);
   }
 
-  const inputClass = "industrial-input mt-1.5 text-sm";
-  const labelClass = "text-xs uppercase tracking-widest text-steel-dark";
-
   const catalogOptions = useMemo(
     () =>
       config.catalogs.map((catalog) => ({
@@ -174,33 +171,37 @@ export default function CategoryAdminPanel() {
   );
 
   if (loading) {
-    return <p className="text-sm text-steel-mid">Cargando categorías…</p>;
+    return <p className="text-xs text-steel-mid">Cargando categorías…</p>;
   }
 
   return (
     <div className="space-y-8">
+      {/* Create Category Form Card */}
       <form
         onSubmit={handleCreate}
-        className="rounded-xl border border-white/[0.06] bg-[var(--input-bg)] p-6"
+        className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 shadow-xl space-y-5"
       >
-        <div className="flex items-center gap-3 border-b border-white/[0.06] pb-4">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-orange/15 text-orange">
+        <div className="flex items-center gap-3.5 border-b border-white/[0.06] pb-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-orange">
             <Tag className="h-4 w-4" aria-hidden />
-          </span>
+          </div>
           <div>
-            <h3 className="font-display text-base uppercase tracking-wide text-steel-light">
-              Nueva categoría
+            <h3 className="text-base font-semibold text-white">
+              Nueva Categoría
             </h3>
             <p className="mt-0.5 text-xs text-steel-dark">
-              Tipo de equipo dentro de un catálogo (comercial, industrial…).
+              Tipo de máquina o equipo asociado a una línea de productos
             </p>
           </div>
         </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="category-catalog" className={labelClass}>
-              Catálogo
+            <label
+              htmlFor="category-catalog"
+              className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark block mb-1.5"
+            >
+              Catálogo Asignado
             </label>
             <CustomSelect
               id="category-catalog"
@@ -208,23 +209,28 @@ export default function CategoryAdminPanel() {
               onChange={setCatalogId}
               options={catalogOptions}
               aria-label="Catálogo"
-              className="mt-1.5"
             />
           </div>
           <div>
-            <label htmlFor="category-label" className={labelClass}>
-              Nombre
+            <label
+              htmlFor="category-label"
+              className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark block mb-1.5"
+            >
+              Nombre de la Categoría
             </label>
             <input
               id="category-label"
               value={newLabel}
               onChange={(event) => setNewLabel(event.target.value)}
-              placeholder="Ej. Tostadores comerciales"
-              className={inputClass}
+              placeholder="Ej. Tostadores Comerciales"
+              className="h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-xs text-white placeholder:text-steel-dark focus:border-orange/50 focus:outline-none focus:ring-1 focus:ring-orange/50 transition-all"
             />
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="category-description" className={labelClass}>
+            <label
+              htmlFor="category-description"
+              className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark block mb-1.5"
+            >
               Descripción (opcional)
             </label>
             <textarea
@@ -232,149 +238,157 @@ export default function CategoryAdminPanel() {
               rows={2}
               value={newDescription}
               onChange={(event) => setNewDescription(event.target.value)}
-              placeholder="Qué tipo de equipos agrupa esta categoría."
-              className={inputClass}
+              placeholder="Qué características o capacidades agrupa esta categoría."
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-xs text-white placeholder:text-steel-dark focus:border-orange/50 focus:outline-none focus:ring-1 focus:ring-orange/50 transition-all resize-none"
             />
           </div>
         </div>
-        <button
-          type="submit"
-          disabled={saving}
-          className="mt-5 inline-flex h-12 items-center gap-2 rounded-xl bg-orange px-5 text-sm font-semibold uppercase tracking-wider text-white transition-colors hover:bg-orange-hover disabled:opacity-60"
-        >
-          <Plus className="h-4 w-4" aria-hidden />
-          Crear categoría
-        </button>
+
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-orange px-5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-orange-hover active:scale-[0.98] disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Crear categoría
+          </button>
+        </div>
       </form>
 
+      {/* Category Table */}
       {config.categories.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-steel-dark/30 bg-[var(--input-bg)] px-6 py-12 text-center">
-          <p className="font-display text-lg text-steel-light">
-            Aún no hay categorías
+        <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] px-6 py-12 text-center">
+          <p className="text-base font-semibold text-white">
+            Aún no hay categorías creadas
           </p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-steel-mid">
-            Crea la primera arriba para poder agrupar y filtrar los productos
-            del sitio.
+          <p className="mx-auto mt-1 max-w-sm text-xs text-steel-mid">
+            Cree la primera en el formulario superior para organizar y filtrar los equipos.
           </p>
         </div>
       ) : (
-        <div className="w-full overflow-x-auto border-t border-b border-white/[0.08]">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-white/[0.08] bg-surface/80 text-xs font-semibold uppercase tracking-wider text-steel-mid">
-              <tr>
-                <th className="px-4 py-3.5 font-semibold">Catálogo</th>
-                <th className="px-4 py-3.5 font-semibold">Nombre</th>
-                <th className="px-4 py-3.5 font-semibold">Identificador</th>
-                <th className="px-4 py-3.5 font-semibold text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {config.categories.map((category) => (
-                <tr
-                  key={category.id}
-                  className="border-b border-white/[0.04] last:border-b-0"
-                >
-                  <td className="px-4 py-4">
-                    <span className="inline-flex rounded-full border border-steel-dark/25 bg-background/40 px-2.5 py-1 text-xs text-steel-mid">
-                      {getCatalogLabel(category.catalogId, config)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    {editingId === category.id ? (
-                      <div className="space-y-2">
-                        <input
-                          value={editLabel}
-                          onChange={(event) => setEditLabel(event.target.value)}
-                          className="industrial-input text-sm"
-                        />
-                        <textarea
-                          value={editDescription}
-                          onChange={(event) =>
-                            setEditDescription(event.target.value)
-                          }
-                          rows={2}
-                          className="industrial-input text-sm"
-                          placeholder="Descripción"
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="font-display text-base text-steel-light">
-                          {category.label}
-                        </p>
-                        {category.description && (
-                          <p className="mt-1 text-xs text-steel-dark">
-                            {category.description}
+        <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#121519]/70 backdrop-blur-xl shadow-xl">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[780px] text-left text-sm">
+              <thead className="border-b border-white/[0.08] bg-white/[0.03] text-xs font-semibold uppercase tracking-wider text-steel-mid">
+                <tr>
+                  <th className="w-44 px-4 py-3.5 font-semibold whitespace-nowrap">Catálogo</th>
+                  <th className="min-w-[260px] px-4 py-3.5 font-semibold">Nombre & Descripción</th>
+                  <th className="w-40 px-4 py-3.5 font-semibold whitespace-nowrap">Identificador</th>
+                  <th className="w-48 px-4 py-3.5 font-semibold text-right pr-6 whitespace-nowrap">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.06]">
+                {config.categories.map((category) => (
+                  <tr
+                    key={category.id}
+                    className="transition-colors hover:bg-white/[0.03]"
+                  >
+                    <td className="w-44 px-4 py-3.5 whitespace-nowrap">
+                      <span className="inline-flex rounded-lg border border-orange/30 bg-orange/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-orange">
+                        {getCatalogLabel(category.catalogId, config)}
+                      </span>
+                    </td>
+                    <td className="min-w-[260px] px-4 py-3.5">
+                      {editingId === category.id ? (
+                        <div className="space-y-2 py-1">
+                          <input
+                            value={editLabel}
+                            onChange={(event) => setEditLabel(event.target.value)}
+                            className="h-9 w-full rounded-lg border border-white/[0.12] bg-black/40 px-3 text-xs text-white focus:border-orange/50 focus:outline-none focus:ring-1 focus:ring-orange/50"
+                            autoFocus
+                          />
+                          <textarea
+                            value={editDescription}
+                            onChange={(event) =>
+                              setEditDescription(event.target.value)
+                            }
+                            rows={2}
+                            className="w-full rounded-lg border border-white/[0.12] bg-black/40 p-2 text-xs text-white focus:border-orange/50 focus:outline-none focus:ring-1 focus:ring-orange/50 resize-none"
+                            placeholder="Descripción"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="font-medium text-white text-sm">
+                            {category.label}
                           </p>
+                          {category.description && (
+                            <p className="mt-0.5 text-xs text-steel-dark leading-relaxed">
+                              {category.description}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="w-40 px-4 py-3.5 whitespace-nowrap font-mono text-xs text-steel-mid">
+                      {category.id}
+                    </td>
+                    <td className="w-48 px-4 py-3.5 text-right pr-6 whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        {editingId === category.id ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveEdit(category.id)}
+                              disabled={saving}
+                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition-all hover:bg-emerald-500 disabled:opacity-50"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              Guardar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(null);
+                                setEditLabel("");
+                                setEditDescription("");
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-steel-light transition-all hover:border-white/[0.16] hover:text-white"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(category.id);
+                                setEditLabel(category.label);
+                                setEditDescription(category.description);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-orange/30 bg-orange/10 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-orange transition-all hover:bg-orange/20"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDelete(category.id)}
+                              disabled={saving}
+                              className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-400 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Eliminar
+                            </button>
+                          </>
                         )}
                       </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 text-steel-mid">{category.id}</td>
-                  <td className="px-4 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2.5">
-                      {editingId === category.id ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => void handleSaveEdit(category.id)}
-                            disabled={saving}
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            Guardar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(null);
-                              setEditLabel("");
-                              setEditDescription("");
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-surface px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-steel-mid transition-colors hover:border-white/20 hover:text-steel-light"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                            Cancelar
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingId(category.id);
-                              setEditLabel(category.label);
-                              setEditDescription(category.description);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-surface px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-orange transition-colors hover:border-orange/50 hover:bg-orange/10"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDelete(category.id)}
-                            disabled={saving}
-                            className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-surface px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-400 transition-colors hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Eliminar
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {error && (
-        <p className="rounded-lg border border-orange/40 bg-orange/10 px-4 py-3 text-sm text-orange">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs font-medium text-red-300">
           {error}
-        </p>
+        </div>
       )}
     </div>
   );

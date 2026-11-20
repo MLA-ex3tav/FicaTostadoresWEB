@@ -60,7 +60,7 @@ export default function CatalogAdminPanel() {
       setConfig(data);
       return true;
     } catch {
-      setError("Error de conexión al guardar.");
+      setError("Error de red al guardar la configuración.");
       return false;
     } finally {
       setSaving(false);
@@ -69,21 +69,23 @@ export default function CatalogAdminPanel() {
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
+
     const label = newLabel.trim();
 
     if (!label) {
-      setError("Ingrese un nombre para el catálogo.");
       return;
     }
 
     const id = uniqueCatalogId(label, config);
+
     const nextConfig: CatalogConfig = {
       ...config,
       catalogs: [...config.catalogs, { id, label }],
     };
 
-    const saved = await saveConfig(nextConfig);
-    if (saved) {
+    const ok = await saveConfig(nextConfig);
+
+    if (ok) {
       setNewLabel("");
     }
   }
@@ -92,7 +94,6 @@ export default function CatalogAdminPanel() {
     const label = editLabel.trim();
 
     if (!label) {
-      setError("El nombre no puede estar vacío.");
       return;
     }
 
@@ -103,29 +104,32 @@ export default function CatalogAdminPanel() {
       ),
     };
 
-    const saved = await saveConfig(nextConfig);
-    if (saved) {
+    const ok = await saveConfig(nextConfig);
+
+    if (ok) {
       setEditingId(null);
       setEditLabel("");
     }
   }
 
   async function handleDelete(catalogId: string) {
-    const catalog = config.catalogs.find((item) => item.id === catalogId);
-    if (!catalog) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `¿Eliminar el catálogo "${catalog.label}"? También se quitarán sus categorías.`,
+    const catalog = config.catalogs.find((entry) => entry.id === catalogId);
+    const affectedCategories = config.categories.filter(
+      (category) => category.catalogId === catalogId,
     );
 
-    if (!confirmed) {
+    const message =
+      affectedCategories.length > 0
+        ? `¿Eliminar el catálogo «${catalog?.label ?? catalogId}» y sus ${affectedCategories.length} categorías asociadas?`
+        : `¿Eliminar el catálogo «${catalog?.label ?? catalogId}»?`;
+
+    if (!window.confirm(message)) {
       return;
     }
 
     const nextConfig: CatalogConfig = {
-      catalogs: config.catalogs.filter((item) => item.id !== catalogId),
+      ...config,
+      catalogs: config.catalogs.filter((entry) => entry.id !== catalogId),
       categories: config.categories.filter(
         (category) => category.catalogId !== catalogId,
       ),
@@ -134,182 +138,188 @@ export default function CatalogAdminPanel() {
     await saveConfig(nextConfig);
   }
 
-  const inputClass = "industrial-input mt-1.5 text-sm";
-  const labelClass = "text-xs uppercase tracking-widest text-steel-dark";
-
   if (loading) {
-    return <p className="text-sm text-steel-mid">Cargando catálogos…</p>;
+    return <p className="text-xs text-steel-mid">Cargando catálogos…</p>;
   }
 
   return (
     <div className="space-y-8">
+      {/* Create Catalog Form Card */}
       <form
         onSubmit={handleCreate}
-        className="rounded-xl border border-white/[0.06] bg-[var(--input-bg)] p-6"
+        className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 shadow-xl space-y-5"
       >
-        <div className="flex items-center gap-3 border-b border-white/[0.06] pb-4">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-orange/15 text-orange">
+        <div className="flex items-center gap-3.5 border-b border-white/[0.06] pb-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-orange">
             <LayoutGrid className="h-4 w-4" aria-hidden />
-          </span>
+          </div>
           <div>
-            <h3 className="font-display text-base uppercase tracking-wide text-steel-light">
-              Nuevo catálogo
+            <h3 className="text-base font-semibold text-white">
+              Nuevo Catálogo
             </h3>
             <p className="mt-0.5 text-xs text-steel-dark">
-              Una línea de productos: café, frutos secos, cacao…
+              Línea principal de productos (café, frutos secos, cacao, etc.)
             </p>
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[14rem] flex-1">
-            <label htmlFor="catalog-label" className={labelClass}>
-              Nombre
+            <label
+              htmlFor="catalog-label"
+              className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark block mb-1.5"
+            >
+              Nombre de la línea
             </label>
             <input
               id="catalog-label"
               value={newLabel}
               onChange={(event) => setNewLabel(event.target.value)}
-              placeholder="Ej. Tostadores de cacao"
-              className={inputClass}
+              placeholder="Ej. Tostadores de Cacao"
+              className="h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 text-xs text-white placeholder:text-steel-dark focus:border-orange/50 focus:outline-none focus:ring-1 focus:ring-orange/50 transition-all"
             />
           </div>
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex h-12 items-center gap-2 rounded-xl bg-orange px-5 text-sm font-semibold uppercase tracking-wider text-white transition-colors hover:bg-orange-hover disabled:opacity-60"
+            className="inline-flex h-11 items-center gap-2 rounded-xl bg-orange px-5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-orange-hover active:scale-[0.98] disabled:opacity-50"
           >
             <Plus className="h-4 w-4" aria-hidden />
             Crear catálogo
           </button>
         </div>
-        <p className="mt-2 text-xs text-steel-dark">
-          El identificador se genera automáticamente desde el nombre.
+        <p className="text-[11px] text-steel-dark">
+          El identificador de URL se generará automáticamente a partir del nombre ingresado.
         </p>
       </form>
 
+      {/* Catalog Table */}
       {config.catalogs.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-steel-dark/30 bg-[var(--input-bg)] px-6 py-12 text-center">
-          <p className="font-display text-lg text-steel-light">
-            Aún no hay catálogos
+        <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] px-6 py-12 text-center">
+          <p className="text-base font-semibold text-white">
+            Aún no hay catálogos creados
           </p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-steel-mid">
-            Crea el primero arriba para empezar a organizar los productos por
-            línea.
+          <p className="mx-auto mt-1 max-w-sm text-xs text-steel-mid">
+            Cree el primero en el formulario superior para comenzar a organizar sus equipos por línea.
           </p>
         </div>
       ) : (
-        <div className="w-full overflow-x-auto border-t border-b border-white/[0.08]">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-white/[0.08] bg-surface/80 text-xs font-semibold uppercase tracking-wider text-steel-mid">
-              <tr>
-                <th className="px-4 py-3.5 font-semibold">Nombre</th>
-                <th className="px-4 py-3.5 font-semibold">Identificador</th>
-                <th className="px-4 py-3.5 font-semibold">Categorías</th>
-                <th className="px-4 py-3.5 font-semibold text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {config.catalogs.map((catalog) => {
-                const categoryCount = config.categories.filter(
-                  (category) => category.catalogId === catalog.id,
-                ).length;
+        <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#121519]/70 backdrop-blur-xl shadow-xl">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="border-b border-white/[0.08] bg-white/[0.03] text-xs font-semibold uppercase tracking-wider text-steel-mid">
+                <tr>
+                  <th className="min-w-[220px] px-4 py-3.5 font-semibold">Nombre</th>
+                  <th className="w-44 px-4 py-3.5 font-semibold whitespace-nowrap">Identificador</th>
+                  <th className="w-40 px-4 py-3.5 font-semibold whitespace-nowrap">Categorías</th>
+                  <th className="w-48 px-4 py-3.5 font-semibold text-right pr-6 whitespace-nowrap">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.06]">
+                {config.catalogs.map((catalog) => {
+                  const categoryCount = config.categories.filter(
+                    (category) => category.catalogId === catalog.id,
+                  ).length;
 
-                return (
-                  <tr
-                    key={catalog.id}
-                    className="border-b border-white/[0.04] last:border-b-0"
-                  >
-                    <td className="px-4 py-4">
-                      {editingId === catalog.id ? (
-                        <input
-                          value={editLabel}
-                          onChange={(event) => setEditLabel(event.target.value)}
-                          className="industrial-input text-sm"
-                        />
-                      ) : (
-                        <span className="font-display text-base text-steel-light">
-                          {catalog.label}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-steel-mid">{catalog.id}</td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs ${
-                          categoryCount > 0
-                            ? "border-steel-dark/25 bg-background/40 text-steel-mid"
-                            : "border-steel-dark/25 text-steel-dark"
-                        }`}
-                      >
-                        {categoryCount === 0
-                          ? "Sin categorías"
-                          : `${categoryCount} categoría${categoryCount === 1 ? "" : "s"}`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2.5">
+                  return (
+                    <tr
+                      key={catalog.id}
+                      className="transition-colors hover:bg-white/[0.03]"
+                    >
+                      <td className="min-w-[220px] px-4 py-3.5">
                         {editingId === catalog.id ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => void handleSaveEdit(catalog.id)}
-                              disabled={saving}
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-emerald-500 disabled:opacity-50"
-                            >
-                              <Check className="h-3.5 w-3.5" />
-                              Guardar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(null);
-                                setEditLabel("");
-                              }}
-                              className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-surface px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-steel-mid transition-colors hover:border-white/20 hover:text-steel-light"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                              Cancelar
-                            </button>
-                          </>
+                          <input
+                            value={editLabel}
+                            onChange={(event) => setEditLabel(event.target.value)}
+                            className="h-9 w-full rounded-lg border border-white/[0.12] bg-black/40 px-3 text-xs text-white focus:border-orange/50 focus:outline-none focus:ring-1 focus:ring-orange/50"
+                            autoFocus
+                          />
                         ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(catalog.id);
-                                setEditLabel(catalog.label);
-                              }}
-                              className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-surface px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-orange transition-colors hover:border-orange/50 hover:bg-orange/10"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(catalog.id)}
-                              disabled={saving}
-                              className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-surface px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-400 transition-colors hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Eliminar
-                            </button>
-                          </>
+                          <span className="font-medium text-white text-sm">
+                            {catalog.label}
+                          </span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="w-44 px-4 py-3.5 whitespace-nowrap font-mono text-xs text-steel-mid">
+                        {catalog.id}
+                      </td>
+                      <td className="w-40 px-4 py-3.5 whitespace-nowrap">
+                        <span
+                          className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                            categoryCount > 0
+                              ? "border-white/[0.08] bg-white/[0.02] text-steel-light"
+                              : "border-white/[0.04] text-steel-dark"
+                          }`}
+                        >
+                          {categoryCount === 0
+                            ? "Sin categorías"
+                            : `${categoryCount} categoría${categoryCount === 1 ? "" : "s"}`}
+                        </span>
+                      </td>
+                      <td className="w-48 px-4 py-3.5 text-right pr-6 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-2">
+                          {editingId === catalog.id ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveEdit(catalog.id)}
+                                disabled={saving}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white transition-all hover:bg-emerald-500 disabled:opacity-50"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                Guardar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(null);
+                                  setEditLabel("");
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-steel-light transition-all hover:border-white/[0.16] hover:text-white"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                Cancelar
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(catalog.id);
+                                  setEditLabel(catalog.label);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-orange/30 bg-orange/10 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-orange transition-all hover:bg-orange/20"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDelete(catalog.id)}
+                                disabled={saving}
+                                className="inline-flex items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-red-400 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Eliminar
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {error && (
-        <p className="rounded-lg border border-orange/40 bg-orange/10 px-4 py-3 text-sm text-orange">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-xs font-medium text-red-300">
           {error}
-        </p>
+        </div>
       )}
     </div>
   );

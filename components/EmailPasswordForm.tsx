@@ -27,7 +27,7 @@ interface EmailPasswordFormProps {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-steel-dark">
+    <span className="mb-1.5 block text-sm font-medium text-steel-mid">
       {children}
     </span>
   );
@@ -240,7 +240,7 @@ export default function EmailPasswordForm({
         )}
 
         {isSignup && (
-          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
             <RequirementItem
               met={passwordLongEnough}
               label="Mínimo 6 caracteres"
@@ -255,7 +255,7 @@ export default function EmailPasswordForm({
         <button
           type="submit"
           disabled={loading}
-          className="mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange px-5 text-sm font-semibold uppercase tracking-wider text-white shadow-lg shadow-orange/20 transition-all hover:-translate-y-0.5 hover:bg-orange-hover hover:shadow-orange/30 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+          className="mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-orange px-5 text-sm font-medium text-white transition-colors hover:bg-orange-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? (
             <>

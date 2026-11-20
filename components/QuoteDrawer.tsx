@@ -3,19 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   ArrowRight,
-  CheckCircle2,
   FileText,
-  MessageSquare,
+  Layers,
+  Loader2,
   ShoppingBag,
   Trash2,
   X,
 } from "lucide-react";
-import { defaultProducts } from "@/lib/products";
+import { defaultProducts, type Product } from "@/lib/products";
+import { PRODUCT_COLORS, getProductColorById } from "@/lib/product-colors";
 import { getProductImageSrc } from "@/lib/product-images";
-import { buildQuoteWhatsAppUrl, openWhatsAppContact } from "@/lib/quoting";
 import { useQuoteSelection } from "@/lib/quote-selection";
 
 export default function QuoteDrawer() {
@@ -23,11 +23,69 @@ export default function QuoteDrawer() {
   const pathname = usePathname();
   const { products, removeProduct, clearProducts, isDrawerOpen, closeDrawer } =
     useQuoteSelection();
-  const [mounted, setMounted] = useState(false);
+
+  const [ready, setReady] = useState(false);
+  const [isNavigating, startNavigation] = useTransition();
+  const [resolvedImages, setResolvedImages] = useState<
+    Record<string, string | null>
+  >({});
 
   useEffect(() => {
-    setMounted(true);
+    const raf = requestAnimationFrame(() => {
+      setReady(true);
+    });
+    return () => cancelAnimationFrame(raf);
   }, []);
+
+  useEffect(() => {
+    const missing = products.filter(
+      (item) =>
+        !item.image &&
+        !defaultProducts.some((product) => product.id === item.id) &&
+        resolvedImages[item.id] === undefined,
+    );
+
+    if (missing.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.all(
+      missing.map(async (item) => {
+        try {
+          const response = await fetch(
+            `/api/products/${encodeURIComponent(item.id)}`,
+          );
+          if (!response.ok) {
+            return [item.id, null] as const;
+          }
+          const data = (await response.json()) as { product?: Product };
+          return [
+            item.id,
+            getProductImageSrc(data.product?.images?.[0]) ?? null,
+          ] as const;
+        } catch {
+          return [item.id, null] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) {
+        return;
+      }
+      setResolvedImages((current) => {
+        const next = { ...current };
+        for (const [id, src] of entries) {
+          next[id] = src;
+        }
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [products, resolvedImages]);
 
   // Close drawer when navigating to checkout pages
   useEffect(() => {
@@ -38,8 +96,7 @@ export default function QuoteDrawer() {
 
   // Lock body scroll when drawer is open
   useEffect(() => {
-    if (!mounted) return;
-    if (isDrawerOpen) {
+    if (isDrawerOpen && ready) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -47,46 +104,24 @@ export default function QuoteDrawer() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isDrawerOpen, mounted]);
+  }, [isDrawerOpen, ready]);
 
-  if (!mounted) return null;
+  const drawerVisible = isDrawerOpen && ready;
 
   const productCount = products.length;
 
-  // Build product line info for WhatsApp button
-  const formattedProductsForWa = products.map((item) => ({
-    name: item.name,
-    capacity: item.capacity,
-    selectedColor: item.selectedColor ?? undefined,
-    selectedColorId: item.selectedColorId ?? undefined,
-    selectedAddOns: item.selectedAddOns?.map((addOn) => ({
-      id: addOn.id,
-      name: addOn.name,
-    })),
-  }));
-
-  const handleWhatsAppClick = () => {
-    const url = buildQuoteWhatsAppUrl(
-      "Cliente Web",
-      "",
-      "Hola, me gustaría cotizar estos equipos que seleccioné en la tienda:",
-      formattedProductsForWa,
-    );
-    openWhatsAppContact(url);
-    closeDrawer();
-  };
-
   const handleCheckoutClick = () => {
-    closeDrawer();
-    router.push("/cotizar");
+    startNavigation(() => {
+      router.push("/cotizar");
+    });
   };
 
   return (
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm transition-opacity duration-300 ${
-          isDrawerOpen
+        className={`fixed inset-0 z-[100] bg-black/60 transition-opacity duration-200 ${
+          drawerVisible
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
         }`}
@@ -99,23 +134,20 @@ export default function QuoteDrawer() {
         role="dialog"
         aria-modal="true"
         aria-label="Panel de Cotización"
-        className={`fixed inset-y-0 right-0 z-[101] flex w-full max-w-lg flex-col border-l border-white/[0.08] bg-[#0E1215] shadow-2xl transition-transform duration-300 ease-out ${
-          isDrawerOpen ? "translate-x-0" : "translate-x-full"
+        className={`fixed inset-y-0 right-0 z-[101] flex w-full max-w-lg flex-col border-l border-[#3a332d] bg-[#171513] font-sans transition-transform duration-200 ease-out ${
+          drawerVisible ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/[0.08] px-6 py-5 bg-panel/60">
+        <div className="flex items-center justify-between shrink-0 border-b border-white/10 px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange/15 text-orange border border-orange/20">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange/10 text-orange">
               <ShoppingBag className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="font-display text-xl uppercase tracking-wider text-steel-light">
-                Tu Cotización
+              <h2 className="font-sans text-lg font-semibold tracking-[-0.02em] text-[#f4eee7]">
+                Tu cotización
               </h2>
-              <p className="text-xs uppercase tracking-widest text-steel-dark">
-                {productCount} {productCount === 1 ? "equipo seleccionado" : "equipos seleccionados"}
-              </p>
             </div>
           </div>
 
@@ -124,7 +156,7 @@ export default function QuoteDrawer() {
               <button
                 type="button"
                 onClick={clearProducts}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs uppercase tracking-wider text-steel-dark transition-colors hover:bg-white/[0.04] hover:text-orange"
+                className="flex min-h-11 min-w-11 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-steel-dark transition-colors hover:bg-white/[0.06] hover:text-white"
                 title="Vaciar lista"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -134,7 +166,7 @@ export default function QuoteDrawer() {
             <button
               type="button"
               onClick={closeDrawer}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] text-steel-mid transition-colors hover:border-orange/40 hover:bg-orange/10 hover:text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.08] text-steel-mid transition-colors hover:bg-white/[0.06] hover:text-white"
               aria-label="Cerrar panel de cotización"
             >
               <X className="h-5 w-5" />
@@ -143,13 +175,13 @@ export default function QuoteDrawer() {
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 space-y-4 sm:px-6 sm:py-6">
           {productCount === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/[0.03] border border-white/[0.06] text-steel-dark mb-4">
-                <ShoppingBag className="h-10 w-10" />
+              <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white/[0.03] border border-white/[0.06] text-steel-dark mb-4">
+                <ShoppingBag className="h-9 w-9" />
               </div>
-              <h3 className="font-display text-2xl uppercase tracking-wide text-steel-light">
+              <h3 className="text-xl font-semibold text-white">
                 Tu lista está vacía
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-steel-mid max-w-xs">
@@ -158,7 +190,7 @@ export default function QuoteDrawer() {
               <Link
                 href="/productos"
                 onClick={closeDrawer}
-                className="mt-6 inline-flex h-12 items-center gap-2 rounded-xl bg-orange px-6 text-sm font-semibold uppercase tracking-wider text-white transition-colors hover:bg-orange-hover shadow-lg shadow-orange/20"
+                className="mt-6 apple-button-primary"
               >
                 Ver Catálogo de Equipos
                 <ArrowRight className="h-4 w-4" />
@@ -170,71 +202,93 @@ export default function QuoteDrawer() {
                 const matchedProduct = defaultProducts.find(
                   (p) => p.id === item.id,
                 );
-                const imageSrc = matchedProduct
-                  ? getProductImageSrc(matchedProduct.images?.[0])
-                  : null;
+                const imageSrc =
+                  item.image ??
+                  resolvedImages[item.id] ??
+                  (matchedProduct
+                    ? getProductImageSrc(matchedProduct.images?.[0])
+                    : null);
+                const colorHex =
+                  (item.selectedColorId
+                    ? getProductColorById(item.selectedColorId)?.hex
+                    : undefined) ??
+                  PRODUCT_COLORS.find(
+                    (color) => color.name === item.selectedColor,
+                  )?.hex;
 
                 return (
                   <li
                     key={item.id}
-                    className="relative flex items-start gap-4 rounded-2xl border border-white/[0.08] bg-panel/70 p-4 transition-all hover:border-steel-dark/40"
+                    className="group relative flex items-stretch overflow-hidden rounded-xl border border-[#39332d] bg-[#201d1a] transition-colors hover:border-[#56483a] hover:bg-[#25211d]"
                   >
                     {/* Thumbnail Image */}
-                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface border border-white/[0.06]">
+                    <div className="relative w-24 shrink-0 self-stretch border-r border-white/[0.06] bg-surface sm:w-32">
                       {imageSrc ? (
                         <Image
                           src={imageSrc}
                           alt={item.name}
                           fill
-                          className="object-cover"
+                          className="object-cover object-center"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-surface/80 text-steel-dark">
-                          <FileText className="h-8 w-8 opacity-40" />
+                          <FileText className="h-7 w-7 opacity-40" />
                         </div>
                       )}
                     </div>
 
                     {/* Product Details */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-display text-xl uppercase tracking-wide text-steel-light truncate">
-                          {item.name}
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={() => removeProduct(item.id)}
-                          className="shrink-0 p-1 text-steel-dark transition-colors hover:text-orange"
-                          aria-label={`Quitar ${item.name}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
+                    <div className="min-w-0 flex-1 py-3.5 pl-3.5 pr-14 sm:py-4 sm:pl-4">
+                      <h4 className="font-sans line-clamp-2 text-sm font-semibold leading-snug tracking-[-0.015em] text-[#f4eee7] sm:text-[15px]">
+                        {item.name}
+                      </h4>
 
-                      <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-orange">
+                      <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-steel-dark">
                         {item.capacity}
                       </p>
 
-                      {item.selectedColor ? (
-                        <p className="mt-1 text-xs text-steel-mid flex items-center gap-1.5">
-                          <span className="h-2.5 w-2.5 rounded-full bg-orange/80 inline-block" />
-                          Color: <strong className="text-steel-light">{item.selectedColor}</strong>
-                        </p>
-                      ) : null}
-
-                      {item.selectedAddOns && item.selectedAddOns.length > 0 ? (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {item.selectedAddOns.map((addOn) => (
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                        {item.selectedColor ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px]">
                             <span
-                              key={addOn.id}
-                              className="inline-flex items-center gap-1 rounded-md border border-orange/30 bg-orange/10 px-2 py-0.5 text-[11px] font-medium text-orange"
-                            >
-                              + {addOn.name}
+                              className="h-2 w-2 shrink-0 rounded-full ring-1 ring-white/25"
+                              style={{ backgroundColor: colorHex ?? "#9aa2ab" }}
+                            />
+                            <span className="text-steel-dark">Color:</span>
+                            <span className="font-medium text-steel-light">
+                              {item.selectedColor}
                             </span>
-                          ))}
-                        </div>
-                      ) : null}
+                          </span>
+                        ) : null}
+
+                        {item.variacionName ? (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-orange/20 bg-orange/5 px-2 py-0.5 text-[11px] font-medium text-orange">
+                            <Layers className="h-3 w-3 shrink-0" aria-hidden />
+                            {item.variacionName}
+                          </span>
+                        ) : null}
+
+                        {item.selectedAddOns && item.selectedAddOns.length > 0
+                          ? item.selectedAddOns.map((addOn) => (
+                              <span
+                                key={addOn.id}
+                                className="inline-flex items-center rounded-md border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-[11px] text-steel-dark"
+                              >
+                                + {addOn.name}
+                              </span>
+                            ))
+                          : null}
+                      </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeProduct(item.id)}
+                      className="absolute right-1.5 top-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-steel-dark transition-colors hover:bg-white/[0.08] hover:text-white"
+                      aria-label={`Quitar ${item.name}`}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
                   </li>
                 );
               })}
@@ -244,40 +298,29 @@ export default function QuoteDrawer() {
 
         {/* Footer (Actions) */}
         {productCount > 0 && (
-          <div className="border-t border-white/[0.08] bg-panel/90 px-6 py-5 space-y-3.5 backdrop-blur-md">
-            <div className="flex items-center justify-between text-xs text-steel-mid">
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Atención directa por la fábrica Fica
-              </span>
-              <span className="font-semibold uppercase tracking-wider text-steel-light">
-                {productCount} {productCount === 1 ? "equipo" : "equipos"}
-              </span>
-            </div>
-
-            <div className="grid gap-2.5 pt-1">
+          <div className="shrink-0 border-t border-[#39332d] bg-[#171513]/95 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 backdrop-blur-xl">
+            <div className="flex items-center">
               <button
                 type="button"
                 onClick={handleCheckoutClick}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange px-5 text-sm font-semibold uppercase tracking-wider text-white transition-all hover:bg-orange-hover shadow-lg shadow-orange/20"
+                disabled={isNavigating}
+                aria-busy={isNavigating}
+                className="flex w-full h-12 items-center justify-center gap-2 rounded-xl bg-orange text-xs font-semibold text-white transition-all hover:bg-orange-hover active:scale-[0.98] shadow-md disabled:cursor-wait disabled:opacity-80"
               >
-                Enviar Cotización
-                <ArrowRight className="h-4 w-4" />
+                {isNavigating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Continuando…
+                  </>
+                ) : (
+                  <>
+                    Continuar cotización
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </button>
 
-              <button
-                type="button"
-                onClick={handleWhatsAppClick}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-5 text-sm font-semibold uppercase tracking-wider text-emerald-400 transition-all hover:border-emerald-500 hover:bg-emerald-500/20"
-              >
-                <MessageSquare className="h-4 w-4" />
-                Cotizar Rápido por WhatsApp
-              </button>
             </div>
-
-            <p className="text-center text-[11px] text-steel-dark">
-              Respuesta en menos de 24 horas hábiles · Envíos a todo Chile e Internacional
-            </p>
           </div>
         )}
       </aside>

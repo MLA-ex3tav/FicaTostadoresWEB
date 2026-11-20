@@ -3,10 +3,9 @@
 import { parsePhoneNumber, type CountryCode } from "libphonenumber-js";
 import es from "react-phone-number-input/locale/es";
 import { sanitizeText } from "@/lib/sanitize";
+import { QUOTE_WHATSAPP } from "@/lib/quote-whatsapp";
 
-export const QUOTE_WHATSAPP = {
-  e164: "56950718852",
-} as const;
+export { QUOTE_WHATSAPP };
 
 export interface QuoteProductAddOnContext {
   id: string;
@@ -18,6 +17,8 @@ export interface QuoteProductContext {
   capacity: string;
   selectedColor?: string | null;
   selectedAddOns?: QuoteProductAddOnContext[];
+  variacionName?: string | null;
+  quantity?: number;
 }
 
 function formatAddOnsLine(
@@ -31,6 +32,10 @@ function formatAddOnsLine(
 }
 
 function countryLabelFromPhone(phone: string): string | null {
+  if (!phone?.trim()) {
+    return null;
+  }
+
   const parsed = parsePhoneNumber(phone);
   const code = parsed?.country;
 
@@ -46,13 +51,22 @@ function buildQuoteText(
   phone: string,
   message?: string,
   products?: QuoteProductContext[],
-  options?: { requestId?: string; email?: string },
+  options?: {
+    requestId?: string;
+    email?: string;
+    rut?: string;
+    clienteTipo?: "empresa" | "persona";
+  },
 ): string {
+  const nombreLabel = options?.clienteTipo === "empresa" ? "Razón social" : "Nombre";
   const lines = [
     "Hola, solicito cotización — Fica Tostadores",
-    `Nombre: ${name}`,
-    `Teléfono: ${phone}`,
+    `${nombreLabel}: ${name}`,
   ];
+
+  if (phone?.trim()) {
+    lines.push(`Teléfono: ${phone.trim()}`);
+  }
 
   const country = countryLabelFromPhone(phone);
   if (country) {
@@ -63,9 +77,16 @@ function buildQuoteText(
     lines.push(`Correo: ${options.email.trim()}`);
   }
 
+  if (options?.rut?.trim()) {
+    lines.push(`RUT: ${options.rut.trim()}`);
+  }
+
   if (products && products.length > 0) {
     if (products.length === 1) {
-      lines.push(`Producto: ${products[0].name}`);
+      lines.push(`Producto: ${products[0].name}${products[0].variacionName ? ` (${products[0].variacionName})` : ""}`);
+      if ((products[0].quantity ?? 1) > 1) {
+        lines.push(`Cantidad: ${products[0].quantity}`);
+      }
       lines.push(`Capacidad: ${products[0].capacity}`);
       if (products[0].selectedColor) {
         lines.push(`Color: ${products[0].selectedColor}`);
@@ -77,7 +98,7 @@ function buildQuoteText(
     } else {
       lines.push("Productos:");
       products.forEach((product, index) => {
-        lines.push(`${index + 1}. ${product.name} — ${product.capacity}`);
+        lines.push(`${index + 1}. ${product.name}${product.variacionName ? ` (${product.variacionName})` : ""} — ${product.capacity}${(product.quantity ?? 1) > 1 ? ` (x${product.quantity})` : ""}`);
         if (product.selectedColor) {
           lines.push(`   Color: ${product.selectedColor}`);
         }
@@ -114,17 +135,30 @@ export function buildQuoteWhatsAppUrl(
   phone: string,
   message?: string,
   products?: QuoteProductContext[],
-  options?: { requestId?: string; email?: string },
+  options?: {
+    requestId?: string;
+    email?: string;
+    rut?: string;
+    clienteTipo?: "empresa" | "persona";
+  },
 ): string {
   const safeName = sanitizeText(name, 120, { required: true }) ?? "";
   const safeMessage = sanitizeText(message, 1000) ?? "";
   const safeEmail = sanitizeText(options?.email, 200) ?? "";
+  const safeRut = sanitizeText(options?.rut, 20) ?? "";
   const safeRequestId = sanitizeText(options?.requestId, 80) ?? "";
+  const clienteTipo =
+    options?.clienteTipo === "empresa" ? "empresa" : "persona";
   const safeProducts = products
     ?.map((product) => ({
       name: sanitizeText(product.name, 200, { required: true }) ?? "",
       capacity: sanitizeText(product.capacity, 100, { required: true }) ?? "",
       selectedColor: sanitizeText(product.selectedColor, 120) || undefined,
+      variacionName: sanitizeText(product.variacionName, 200) || undefined,
+      quantity:
+        product.quantity && product.quantity > 1
+          ? Math.min(99, Math.max(1, Math.floor(product.quantity)))
+          : undefined,
       selectedAddOns: product.selectedAddOns
         ?.map((addOn) => ({
           id: sanitizeText(addOn.id, 80, { required: true }) ?? "",
@@ -137,6 +171,8 @@ export function buildQuoteWhatsAppUrl(
   const text = encodeURIComponent(
     buildQuoteText(safeName, phone, safeMessage, safeProducts, {
       email: safeEmail || undefined,
+      rut: safeRut || undefined,
+      clienteTipo,
       requestId: safeRequestId || undefined,
     }),
   );

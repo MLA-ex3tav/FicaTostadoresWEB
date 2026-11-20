@@ -4,6 +4,11 @@ import type { UserRole } from "@/lib/permissions";
 
 export async function syncAuthSession(
   user: User,
-): Promise<{ role: UserRole | null; isStaff: boolean; isAdmin: boolean }> {
+): Promise<{
+  role: UserRole | null;
+  isStaff: boolean;
+  isAdmin: boolean;
+  verificationError?: string;
+}> {
   return syncAuthSessionClient(user);
 }

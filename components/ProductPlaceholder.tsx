@@ -5,14 +5,12 @@ interface ProductPlaceholderProps {
 
 export default function ProductPlaceholder({
   className = "h-48",
-  flat = false,
+  flat = true,
 }: ProductPlaceholderProps) {
   return (
     <div
       className={`relative flex items-center justify-center overflow-hidden rounded-t-xl ${
-        flat
-          ? "bg-surface"
-          : "bg-gradient-to-br from-[#4a5059] via-[#3a3f48] to-[#525862]"
+        flat ? "bg-surface" : "bg-[#252930]"
       } ${className}`}
     >
       <div

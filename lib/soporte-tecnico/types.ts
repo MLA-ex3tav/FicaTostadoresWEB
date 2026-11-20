@@ -15,3 +15,24 @@ export interface WebSolicitudSoporteTecnicoRecord {
   equipmentLocation: string | null;
   createdAt: Timestamp;
 }
+
+/** Vista de una solicitud de soporte/servicio técnico para el cliente autenticado. */
+export interface ClientSolicitudSoporteTecnico {
+  id: string;
+  createdAt: string | null;
+  equipmentModel: string;
+  productId?: string | null;
+  issueCategory: string;
+  issueCategoryLabel: string;
+  issueDescription: string;
+  equipmentLocation?: string | null;
+  estado?: string | null;
+  estadoLabel?: string | null;
+  enOT?: boolean;
+  otFolio?: string | null;
+  otNumero?: string | null;
+  produccionEtapa?: string | null;
+  produccionEtapaLabel?: string | null;
+  estadoActualizadoAt?: string | null;
+}
+

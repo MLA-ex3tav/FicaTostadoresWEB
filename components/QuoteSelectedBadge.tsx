@@ -13,7 +13,7 @@ export default function QuoteSelectedLabel({
   return (
     <span
       className={cn(
-        "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-orange/45 bg-orange/10 text-orange",
+        "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-[#17191d] text-orange",
         className,
       )}
       title="En cotización"

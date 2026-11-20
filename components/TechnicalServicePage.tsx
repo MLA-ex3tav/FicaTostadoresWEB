@@ -1,73 +1,88 @@
 import Link from "next/link";
-import { ArrowLeft, Mail, Phone } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
+import GranoDecor from "@/components/GranoDecor";
 import TechnicalServiceForm from "@/components/TechnicalServiceForm";
-import { companyInfo } from "@/lib/company";
-import { getProducts } from "@/lib/products-server";
+import Reveal from "@/components/motion/Reveal";
+
+import type { CatalogConfig } from "@/lib/catalog-config";
+import type { Product } from "@/lib/products";
 
 function TechnicalServiceFormFallback() {
   return (
     <div
-      className="h-96 animate-pulse rounded-lg border border-white/[0.06] bg-panel/40"
+      className="h-[32rem] animate-pulse rounded-2xl border border-white/[0.06] bg-white/[0.02]"
       role="status"
     />
   );
 }
 
-export default async function TechnicalServicePage() {
-  const products = await getProducts();
+interface TechnicalServicePageProps {
+  products: Product[];
+  catalogConfig: CatalogConfig;
+}
+
+export default function TechnicalServicePage({
+  products,
+  catalogConfig,
+}: TechnicalServicePageProps) {
 
   return (
-    <main className="min-h-screen">
-      {/* Hero compacto + formulario */}
-      <section className="mx-auto max-w-3xl px-4 py-12 sm:py-14 md:px-6">
-        <Link
-          href="/"
-          className="mb-8 inline-flex items-center gap-2 text-sm text-steel-mid transition-colors hover:text-orange"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver al inicio
-        </Link>
+    <main className="relative isolate min-h-screen overflow-hidden py-10 md:py-16">
+      <GranoDecor
+        variant="grano2"
+        className="right-0 top-20 w-20 -rotate-12 sm:w-32"
+        opacity={0.08}
+      />
+      <GranoDecor
+        variant="grano"
+        className="left-[4%] top-1/3 hidden w-32 rotate-12 lg:block"
+        opacity={0.07}
+      />
+      <GranoDecor
+        variant="grano2"
+        className="bottom-10 left-2 w-20 rotate-45 sm:w-24"
+        opacity={0.05}
+      />
 
-        <p className="text-xs uppercase tracking-[0.3em] text-orange">
-          Soporte técnico
-        </p>
-        <h1 className="mt-3 font-display text-4xl leading-tight tracking-wide text-steel-light md:text-5xl">
-          PIDE <span className="text-orange">SOPORTE TÉCNICO</span>
-        </h1>
-        <p className="mt-4 text-base leading-relaxed text-steel-mid">
-          Cuéntanos qué equipo tienes y qué falla o servicio necesitas. Te
-          ayudamos en minutos.
-        </p>
-
-        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-steel-mid">
-          <a
-            href={`mailto:${companyInfo.emailVentas}`}
-            className="inline-flex items-center gap-2 transition-colors hover:text-orange"
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
+        {/* Navegación superior volver */}
+        <Reveal>
+          <Link
+            href="/"
+            className="group mb-8 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-steel-dark transition-colors hover:text-white"
           >
-            <Mail className="h-4 w-4" />
-            {companyInfo.emailVentas}
-          </a>
-          {companyInfo.phones.map((phone) => (
-            <a
-              key={phone.href}
-              href={phone.whatsapp}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 transition-colors hover:text-orange"
-            >
-              <Phone className="h-4 w-4" />
-              {phone.value}
-            </a>
-          ))}
-        </div>
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+            Volver al inicio
+          </Link>
+        </Reveal>
 
-        <div className="mt-10">
-          <Suspense fallback={<TechnicalServiceFormFallback />}>
-            <TechnicalServiceForm products={products} />
-          </Suspense>
+        {/* Encabezado */}
+        <Reveal>
+          <h1 className="max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            Soporte <span className="text-orange">técnico</span> y mantención
+          </h1>
+
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-steel-mid sm:text-base">
+            Cuéntanos qué equipo utilizas y qué asistencia necesitas. La
+            solicitud llega directamente a nuestro equipo técnico.
+          </p>
+        </Reveal>
+
+        {/* Formulario técnico centrado */}
+        <div className="mt-8 md:mt-10">
+          <div className="mx-auto max-w-3xl">
+            <Reveal delay={0.08}>
+              <Suspense fallback={<TechnicalServiceFormFallback />}>
+                <TechnicalServiceForm
+                  products={products}
+                  catalogConfig={catalogConfig}
+                />
+              </Suspense>
+            </Reveal>
+          </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }

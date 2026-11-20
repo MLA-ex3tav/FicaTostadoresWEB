@@ -3,6 +3,8 @@
  * @see https://vercel.com/docs/vercel-blob/using-blob-sdk
  */
 
+import { isLocalDevMode } from "./local-dev/mode";
+
 interface BlobCommandOptions {
   token?: string;
   oidcToken?: string;
@@ -107,6 +109,10 @@ export function isLocalProductUploadPath(src: string): boolean {
 /** Convierte rutas locales del admin a URLs públicas de Blob cuando el store está configurado. */
 export function resolveStorageImageUrl(src: string): string {
   const trimmed = src.trim();
+
+  if (isLocalDevMode()) {
+    return trimmed;
+  }
 
   if (!isLocalProductUploadPath(trimmed)) {
     return trimmed;

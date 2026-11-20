@@ -8,23 +8,34 @@
     "start": "next start",
     "lint": "eslint",
     "migrate:uploads": "node --env-file=.env.local scripts/migrate-local-uploads-to-blob.mjs",
-    "migrate:firestore": "node --env-file=.env.local scripts/migrate-catalog-to-firestore.mjs"
+    "migrate:firestore": "node --env-file=.env.local scripts/migrate-catalog-to-firestore.mjs",
+    "cleanup:clientes": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/cleanup-clientes-fields.mjs",
+    "migrate:staff": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/migrate-staff-legacy.mjs",
+    "audit:firestore": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/audit-firestore.mjs",
+    "fcm:devices": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/fcm-devices.mjs",
+    "fcm:test": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/fcm-test.mjs",
+    "test": "vitest run",
+    "cleanup:blobs": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/cleanup-orphan-blob-images.mjs"
   },
   "dependencies": {
+    "@blobatar/react": "^2.7.0",
     "@react-oauth/google": "^0.13.5",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "@vercel/blob": "^2.4.0",
+    "blobatar": "^2.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "^12.15.0",
     "firebase-admin": "^14.0.0",
     "framer-motion": "^12.41.0",
+    "google-auth-library": "^11.0.0",
     "libphonenumber-js": "^1.13.6",
     "lucide": "^1.28.0",
     "lucide-react": "^1.21.0",
     "morphicons": "^1.4.1",
     "next": "16.2.9",
+    "nodemailer": "^9.0.5",
     "radix-ui": "^1.6.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -38,14 +49,24 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "postcss": "^8.5.10"
-  }
+  },
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 111",
+    "safari >= 16.4",
+    "ios_saf >= 16.4",
+    "not dead"
+  ]
 }

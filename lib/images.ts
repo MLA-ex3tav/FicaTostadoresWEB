@@ -1,6 +1,7 @@
 import type { ProductImageFocus } from "@/lib/product-images";
 
 export const logoPath = "/images/general/logo.png";
+export const authHeroPath = "/images/general/auth-hero.jpg";
 
 export interface HeroTechnicalDetail {
   label: string;
@@ -13,11 +14,9 @@ export interface HeroProductBanner {
   name: string;
   capacity: string;
   description: string;
-  technicalDetails: HeroTechnicalDetail[];
-  features: string[];
+  technicalDetails?: HeroTechnicalDetail[];
+  features?: string[];
   categoryLabel: string;
   catalogLabel: string;
   carouselFocus: ProductImageFocus;
-  isPromo?: boolean;
-  promoTag?: string;
 }

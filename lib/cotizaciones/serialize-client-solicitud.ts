@@ -79,6 +79,9 @@ function readProductLine(value: unknown): CotizacionProductLine | null {
     selectedColor: readString(record.selectedColor),
     selectedColorId: readString(record.selectedColorId),
     selectedAddOns,
+    variacionId: readString(record.variacionId),
+    variacionName: readString(record.variacionName),
+    quantity: Math.max(1, Math.min(99, Math.floor(Number(record.quantity)) || 1)),
   };
 }
 

@@ -19,11 +19,11 @@ const STATUS_LABELS: Record<HealthStatus, string> = {
 function statusBadgeClass(status: HealthStatus): string {
   switch (status) {
     case "ok":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
     case "warning":
       return "border-orange/30 bg-orange/10 text-orange";
     case "error":
-      return "border-red-500/30 bg-red-500/10 text-red-300";
+      return "border-red-500/30 bg-red-500/10 text-red-400";
     default: {
       const exhaustive: never = status;
       return exhaustive;
@@ -61,23 +61,23 @@ function ElectronPresenceHighlight({ check }: { check: HealthCheck }) {
 
   return (
     <section
-      className="rounded-xl border border-white/[0.06] bg-[var(--input-bg)] px-4 py-5"
+      className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6 shadow-xl space-y-3"
       aria-labelledby="electron-presence-title"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-widest text-steel-dark">
-            Escritorio
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark">
+            Aplicación de Escritorio
           </p>
           <h2
             id="electron-presence-title"
-            className="mt-2 font-display text-xl tracking-wide text-steel-light"
+            className="mt-1 text-lg font-semibold text-white"
           >
-            App administrativa (Tauri)
+            App Administrativa (Tauri)
           </h2>
         </div>
         <span
-          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium uppercase tracking-wide ${statusBadgeClass(check.status)}`}
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wider ${statusBadgeClass(check.status)}`}
         >
           <span
             className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-400" : check.status === "warning" ? "bg-orange" : "bg-red-400"}`}
@@ -87,20 +87,19 @@ function ElectronPresenceHighlight({ check }: { check: HealthCheck }) {
         </span>
       </div>
 
-      <p className="mt-4 text-sm text-steel-mid">{check.message}</p>
+      <p className="text-sm text-steel-mid leading-relaxed">{check.message}</p>
 
       {check.details?.length ? (
-        <ul className="mt-3 space-y-1 text-xs text-steel-dark">
+        <ul className="space-y-1 text-xs text-steel-dark list-disc pl-4">
           {check.details.map((detail) => (
             <li key={detail}>{detail}</li>
           ))}
         </ul>
       ) : null}
 
-      <p className="mt-4 text-xs text-steel-dark">
-        La App administrativa (Tauri) debe enviar POST a{" "}
-        <span className="text-steel-mid">/api/electron/heartbeat</span> cada
-        30–45 s con el secreto compartido.
+      <p className="text-[11px] text-steel-dark pt-1">
+        La App administrativa debe reportar latidos POST a{" "}
+        <span className="font-mono text-steel-light">/api/electron/heartbeat</span> periódicamente con el secreto de sincronización.
       </p>
     </section>
   );
@@ -115,6 +114,7 @@ export default function SystemHealthPanel({ report }: SystemHealthPanelProps) {
   const categoryOrder: HealthCategory[] = [
     "firebase",
     "vercel",
+    "monitoreo",
     "integraciones",
     "paginas",
     "api",
@@ -126,48 +126,49 @@ export default function SystemHealthPanel({ report }: SystemHealthPanelProps) {
         <ElectronPresenceHighlight check={electronCheck} />
       ) : null}
 
+      {/* Metric Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-white/[0.06] bg-[var(--input-bg)] px-4 py-4">
-          <p className="text-xs uppercase tracking-widest text-steel-dark">
-            Operativos
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.02] p-5 shadow-lg">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-emerald-400">
+            Servicios Operativos
           </p>
-          <p className="mt-2 font-display text-3xl text-emerald-300">
+          <p className="mt-2 text-3xl font-mono font-semibold text-emerald-300">
             {report.summary.ok}
           </p>
         </div>
-        <div className="rounded-xl border border-white/[0.06] bg-[var(--input-bg)] px-4 py-4">
-          <p className="text-xs uppercase tracking-widest text-steel-dark">
+        <div className="rounded-2xl border border-orange/20 bg-orange/[0.02] p-5 shadow-lg">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-orange">
             Advertencias
           </p>
-          <p className="mt-2 font-display text-3xl text-orange">
+          <p className="mt-2 text-3xl font-mono font-semibold text-orange">
             {report.summary.warning}
           </p>
         </div>
-        <div className="rounded-xl border border-white/[0.06] bg-[var(--input-bg)] px-4 py-4">
-          <p className="text-xs uppercase tracking-widest text-steel-dark">
-            Errores
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.02] p-5 shadow-lg">
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-red-400">
+            Errores Críticos
           </p>
-          <p className="mt-2 font-display text-3xl text-red-300">
+          <p className="mt-2 text-3xl font-mono font-semibold text-red-300">
             {report.summary.error}
           </p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/[0.06] bg-[var(--input-bg)] px-4 py-4 text-sm text-steel-mid">
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 text-xs text-steel-mid shadow-sm space-y-1">
         <p>
           Última verificación:{" "}
-          <span className="text-steel-light">
+          <span className="text-white font-medium">
             {formatCheckedAt(report.checkedAt)}
           </span>
         </p>
-        <p className="mt-1">
-          Entorno:{" "}
-          <span className="text-steel-light">{report.environment}</span>
+        <p>
+          Entorno de ejecución:{" "}
+          <span className="font-mono text-white font-medium">{report.environment}</span>
         </p>
         {report.deploymentUrl ? (
-          <p className="mt-1">
-            Base de comprobación:{" "}
-            <span className="text-steel-light">{report.deploymentUrl}</span>
+          <p>
+            URL Base comprobada:{" "}
+            <span className="font-mono text-white font-medium">{report.deploymentUrl}</span>
           </p>
         ) : null}
       </div>
@@ -180,49 +181,51 @@ export default function SystemHealthPanel({ report }: SystemHealthPanelProps) {
         }
 
         return (
-          <section key={category}>
-            <h2 className="font-display text-xl tracking-wide text-steel-light">
+          <section key={category} className="space-y-4">
+            <h2 className="text-lg font-semibold text-white">
               {HEALTH_CATEGORY_LABELS[category]}
             </h2>
-            <div className="mt-4 overflow-x-auto rounded-xl border border-white/[0.06] bg-[var(--input-bg)]">
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-white/[0.06] text-xs uppercase tracking-widest text-steel-dark">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Servicio</th>
-                    <th className="px-4 py-3 font-medium">Estado</th>
-                    <th className="px-4 py-3 font-medium">Detalle</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {checks.map((check) => (
-                    <tr
-                      key={check.id}
-                      className="border-b border-white/[0.04] last:border-b-0 align-top"
-                    >
-                      <td className="px-4 py-4 text-steel-light">
-                        {check.name}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium uppercase tracking-wide ${statusBadgeClass(check.status)}`}
-                        >
-                          {STATUS_LABELS[check.status]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-steel-mid">
-                        <p>{check.message}</p>
-                        {check.details?.length ? (
-                          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-steel-dark">
-                            {check.details.map((detail) => (
-                              <li key={detail}>{detail}</li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </td>
+            <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#121519]/70 backdrop-blur-xl shadow-xl">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[700px] text-left text-sm">
+                  <thead className="border-b border-white/[0.08] bg-white/[0.03] text-xs font-semibold uppercase tracking-wider text-steel-mid">
+                    <tr>
+                      <th className="w-56 px-4 py-3.5 font-semibold">Servicio</th>
+                      <th className="w-40 px-4 py-3.5 font-semibold">Estado</th>
+                      <th className="px-4 py-3.5 font-semibold">Detalle</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.06]">
+                    {checks.map((check) => (
+                      <tr
+                        key={check.id}
+                        className="transition-colors hover:bg-white/[0.03] align-top"
+                      >
+                        <td className="w-56 px-4 py-4 font-medium text-white">
+                          {check.name}
+                        </td>
+                        <td className="w-40 px-4 py-4">
+                          <span
+                            className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold uppercase tracking-wider ${statusBadgeClass(check.status)}`}
+                          >
+                            {STATUS_LABELS[check.status]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-steel-mid text-xs leading-relaxed">
+                          <p className="text-steel-light">{check.message}</p>
+                          {check.details?.length ? (
+                            <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-steel-dark">
+                              {check.details.map((detail) => (
+                                <li key={detail}>{detail}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
         );

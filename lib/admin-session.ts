@@ -1,8 +1,9 @@
 import {
   getRequestIdToken,
-  getUserRoleFromRest,
+  getUserRoleFromStaff,
   verifyFirebaseUser,
 } from "@/lib/firebase-user-session";
+import { isLocalDevMode } from "@/lib/local-dev/mode";
 import {
   canManageUsers,
   isStaffRole,
@@ -18,7 +19,20 @@ export interface StaffSession {
   role: UserRole;
 }
 
+const LOCAL_STAFF_SESSION: StaffSession = {
+  uid: "localdev0001",
+  email: "local@fica.local",
+  displayName: "Desarrollo local",
+  photoURL: null,
+  emailVerified: true,
+  role: "admin",
+};
+
 async function getStaffSession(request: Request): Promise<StaffSession | null> {
+  if (isLocalDevMode()) {
+    return LOCAL_STAFF_SESSION;
+  }
+
   const token = getRequestIdToken(request);
   const user = await verifyFirebaseUser(request);
 
@@ -26,7 +40,7 @@ async function getStaffSession(request: Request): Promise<StaffSession | null> {
     return null;
   }
 
-  const role = await getUserRoleFromRest(user.uid, token);
+  const role = await getUserRoleFromStaff(user.uid);
 
   if (!role || !isStaffRole(role)) {
     return null;

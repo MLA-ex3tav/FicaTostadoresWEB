@@ -55,7 +55,16 @@ imageRemotePatterns.push({
 });
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["sharp"],
+  serverExternalPackages: ["sharp", "firebase-admin"],
+  turbopack: {
+    resolveAlias: {
+      "../build/polyfills/polyfill-module": "./lib/empty-module.ts",
+      "next/dist/build/polyfills/polyfill-module": "./lib/empty-module.ts",
+    },
+  },
+  experimental: {
+    inlineCss: true,
+  },
   env: {
     NEXT_PUBLIC_BLOB_STORE_ID: process.env.BLOB_STORE_ID,
   },
@@ -65,6 +74,34 @@ const nextConfig: NextConfig = {
     ...getLocalNetworkDevOrigins(),
     ...extraDevOrigins,
   ],
+  async rewrites() {
+    // Proxy transparente del handler de Firebase Auth para usar el dominio
+    // propio (authDomain = www.tostadoresfica.cl) sin cambiar DNS.
+    return [
+      {
+        source: "/__/auth/:path*",
+        destination: "https://fica-tostadores.firebaseapp.com/__/auth/:path*",
+      },
+    ];
+  },
+  async headers() {
+    // Link headers (RFC 8288) para descubrimiento por agentes.
+    const linkValue = [
+      '</.well-known/api-catalog>; rel="api-catalog"',
+      '</.well-known/ai-catalog.json>; rel="ai-catalog"',
+      '</.well-known/agent-skills/index.json>; rel="agent-skills"',
+      '</api/openapi>; rel="service-desc"; type="application/openapi+json"',
+      '</llms.txt>; rel="describedby"; type="text/markdown"',
+      '</sitemap.xml>; rel="sitemap"',
+    ].join(", ");
+
+    return [
+      {
+        source: "/",
+        headers: [{ key: "Link", value: linkValue }],
+      },
+    ];
+  },
   images: {
     qualities: [75, 80],
     localPatterns: [

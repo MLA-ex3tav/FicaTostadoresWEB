@@ -21,15 +21,22 @@ export interface QuoteProductItem {
   id: string;
   name: string;
   capacity: string;
+  /** Imagen de referencia del producto (resuelta al agregarlo). */
+  image?: string | null;
   selectedColor?: string | null;
   selectedColorId?: string | null;
   selectedAddOns?: QuoteProductAddOn[];
+  variacionId?: string | null;
+  variacionName?: string | null;
+  /** Cantidad solicitada (1 por defecto). */
+  quantity?: number;
 }
 
 interface QuoteSelectionContextValue {
   products: QuoteProductItem[];
   addProduct: (product: QuoteProductItem, openDrawerOnAdd?: boolean) => void;
   updateProductAddOns: (id: string, selectedAddOns: QuoteProductAddOn[]) => void;
+  updateQuantity: (id: string, quantity: number) => void;
   removeProduct: (id: string) => void;
   hasProduct: (id: string) => boolean;
   clearProducts: () => void;
@@ -102,13 +109,34 @@ function normalizeStoredProduct(value: unknown): QuoteProductItem | null {
       ? record.selectedColorId.trim()
       : null;
 
+  const variacionId =
+    typeof record.variacionId === "string" && record.variacionId.trim()
+      ? record.variacionId.trim()
+      : null;
+
+  const variacionName =
+    typeof record.variacionName === "string" && record.variacionName.trim()
+      ? record.variacionName.trim()
+      : null;
+
+  const quantity = Math.max(1, Math.min(99, Number(record.quantity) || 1));
+
+  const image =
+    typeof record.image === "string" && record.image.trim()
+      ? record.image.trim()
+      : null;
+
   return {
     id,
     name,
     capacity,
+    image,
     selectedColor,
     selectedColorId,
     selectedAddOns,
+    variacionId,
+    variacionName,
+    quantity,
   };
 }
 
@@ -174,14 +202,18 @@ export function QuoteSelectionProvider({ children }: { children: ReactNode }) {
             ...next[existingIndex],
             name: normalized.name,
             capacity: normalized.capacity,
+            image: normalized.image ?? next[existingIndex].image,
             selectedColor: normalized.selectedColor,
             selectedColorId: normalized.selectedColorId,
             selectedAddOns: normalized.selectedAddOns,
+            variacionId: normalized.variacionId,
+            variacionName: normalized.variacionName,
+            quantity: next[existingIndex].quantity ?? 1,
           };
           return next;
         }
 
-        return [...current, normalized];
+        return [...current, { ...normalized, quantity: normalized.quantity ?? 1 }];
       });
 
       if (openDrawerOnAdd) {
@@ -202,6 +234,15 @@ export function QuoteSelectionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const updateQuantity = useCallback((id: string, quantity: number) => {
+    const qty = Math.max(1, Math.min(99, Math.floor(quantity) || 1));
+    setProducts((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, quantity: qty } : item,
+      ),
+    );
+  }, []);
+
   const removeProduct = useCallback((id: string) => {
     setProducts((current) => current.filter((item) => item.id !== id));
   }, []);
@@ -220,6 +261,7 @@ export function QuoteSelectionProvider({ children }: { children: ReactNode }) {
       products,
       addProduct,
       updateProductAddOns,
+      updateQuantity,
       removeProduct,
       hasProduct,
       clearProducts,
@@ -235,6 +277,7 @@ export function QuoteSelectionProvider({ children }: { children: ReactNode }) {
       products,
       addProduct,
       updateProductAddOns,
+      updateQuantity,
       removeProduct,
       hasProduct,
       clearProducts,

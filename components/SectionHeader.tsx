@@ -1,13 +1,12 @@
 import type { ReactNode } from "react";
 
-export const sectionEyebrowClass =
-  "flex items-center gap-2.5 text-sm font-medium uppercase tracking-[0.3em] text-steel-dark";
+export const sectionEyebrowClass = "text-sm font-medium text-steel-dark";
 
 export const sectionTitleClass =
-  "font-display text-3xl tracking-wide text-steel-light md:text-4xl";
+  "text-3xl font-medium tracking-tight text-steel-light md:text-4xl";
 
 export const sectionDescriptionClass =
-  "mt-3 text-base leading-relaxed text-steel-mid";
+  "mt-4 text-base leading-relaxed text-steel-mid";
 
 interface SectionHeaderProps {
   eyebrow?: string;
@@ -34,15 +33,9 @@ export default function SectionHeader({
   return (
     <div className={wrapperClass}>
       {eyebrow ? (
-        <p className={sectionEyebrowClass}>
-          <span
-            className="h-px w-7 shrink-0 bg-orange"
-            aria-hidden="true"
-          />
-          {eyebrow}
-        </p>
+        <p className={sectionEyebrowClass}>{eyebrow}</p>
       ) : null}
-      <Heading className={`mt-3 ${sectionTitleClass}`}>{title}</Heading>
+      <Heading className={`mt-2 ${sectionTitleClass}`}>{title}</Heading>
       {description ? (
         <p className={sectionDescriptionClass}>{description}</p>
       ) : null}

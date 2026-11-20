@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -16,11 +17,10 @@ import {
   type TransitionEvent,
 } from "react";
 import MediaImage from "./MediaImage";
-import PromoBadge from "./PromoBadge";
 import type { HeroProductBanner } from "@/lib/images";
+import { DEFAULT_HERO_BANNERS } from "@/lib/hero-banners";
 import {
   CAROUSEL_CONTAINER_CLASS,
-  CAROUSEL_DEFAULT_FOCUS,
   focusToObjectPosition,
 } from "@/lib/product-images";
 
@@ -28,36 +28,8 @@ interface HeroCarouselProps {
   banners: HeroProductBanner[];
 }
 
-const AUTO_ADVANCE_MS = 6000;
+const AUTO_ADVANCE_MS = 12000;
 const SWIPE_THRESHOLD_PX = 48;
-
-const DEFAULT_BANNERS: HeroProductBanner[] = [
-  {
-    productId: "",
-    src: "",
-    name: "FICA TOSTADORES",
-    capacity: "Maquinaria industrial de tueste",
-    description:
-      "Equipos robustos para café, cacao, frutos secos, granos y semillas. Tecnología robusta, precisión en cada lote y soporte técnico especializado.",
-    technicalDetails: [
-      { label: "Capacidad máxima", value: "Según modelo" },
-      { label: "Capacidad mínima", value: "Según modelo" },
-      { label: "Producción", value: "Continua o por lote" },
-      { label: "Dimensiones", value: "Consultar ficha técnica" },
-      { label: "Peso neto", value: "Variable" },
-      { label: "Gas", value: "GLP, natural o leña" },
-    ],
-    features: [
-      "Fabricación chilena, IX Región",
-      "Soporte técnico en instalación y mantenimiento",
-      "Líneas para café, frutos secos y procesamiento",
-      "Equipos a gas, eléctricos o a leña",
-    ],
-    categoryLabel: "Ingeniería de tueste",
-    catalogLabel: "Catálogo completo",
-    carouselFocus: CAROUSEL_DEFAULT_FOCUS,
-  },
-];
 
 function getRealSlideIndex(trackIndex: number, slideCount: number): number {
   if (slideCount <= 1) {
@@ -92,9 +64,6 @@ function HeroBannerSlide({
   banner: HeroProductBanner;
   priority: boolean;
 }) {
-  const href = banner.productId
-    ? `/productos/${banner.productId}`
-    : "/productos";
   const hasImage = banner.src.length > 0;
 
   return (
@@ -112,14 +81,14 @@ function HeroBannerSlide({
         />
       ) : (
         <div
-          className="absolute inset-0 z-0 bg-gradient-to-br from-[#2a3038] via-[#1a1d22] to-[#0f1114]"
+          className="absolute inset-0 z-0 bg-[#17191d]"
           aria-hidden="true"
         />
       )}
 
       {/* Overlay sutil: prioriza el lado del contenido */}
       <div
-        className="absolute inset-0 z-[1] bg-gradient-to-t from-background via-background/40 to-background/10"
+        className="absolute inset-0 z-[1] bg-gradient-to-r from-black/85 via-black/50 to-black/10"
         aria-hidden="true"
       />
       <div
@@ -127,70 +96,46 @@ function HeroBannerSlide({
         aria-hidden="true"
       />
 
-      {banner.isPromo ? (
-        <PromoBadge
-          label={banner.promoTag}
-          size="lg"
-          className="absolute right-4 top-4 z-[3] sm:right-8 sm:top-8"
-        />
-      ) : null}
-
       {/* Contenido */}
-      <div className="pointer-events-none absolute inset-0 z-[2] flex h-full flex-col justify-center">
+      <div className="pointer-events-none absolute inset-0 z-[2] flex h-full flex-col justify-center md:pb-16">
         <div className="mx-auto w-full max-w-[1550px] px-4 md:px-8 lg:px-12">
           <div className="max-w-xl">
-            {/* Mobile */}
-            <div className="md:hidden">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-orange">
-                {banner.catalogLabel}
+            <div className="py-4 pr-2 sm:py-8 sm:pr-6 lg:py-10">
+              <p className="text-xs font-medium text-white/75">
+                Fabricación en Chile
                 {banner.categoryLabel ? ` · ${banner.categoryLabel}` : null}
               </p>
-              <h2 className="mt-2 font-display text-3xl leading-tight tracking-wide text-white">
-                {banner.name.toUpperCase()}
+              <h2 className="mt-3 max-w-[17ch] text-balance text-2xl font-medium leading-[1.08] tracking-tight text-white sm:text-4xl lg:text-5xl">
+                Tostadores y equipos de proceso para tu producción
               </h2>
+              <p className="mt-4 text-sm font-medium text-white/85 sm:text-base">
+                {banner.name}
+                {banner.capacity ? ` · ${banner.capacity}` : null}
+              </p>
               {banner.description ? (
-                <p className="mt-3 text-sm leading-relaxed text-white/90 line-clamp-3">
+                <p className="mt-2 line-clamp-1 max-w-md text-sm leading-relaxed text-white/75 sm:line-clamp-3 sm:text-base">
                   {banner.description}
                 </p>
               ) : null}
-              <Link
-                href={href}
-                className="pointer-events-auto mt-4 inline-flex items-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-hover"
-                onClick={(event) => event.stopPropagation()}
-              >
-                Ver producto
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-
-            {/* Desktop: panel glass lateral */}
-            <div className="hidden md:block">
-              <div className="rounded-2xl border border-white/10 bg-black/45 p-8 backdrop-blur-md lg:p-10">
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-orange">
-                  <span className="h-px w-6 bg-orange" aria-hidden="true" />
-                  {banner.catalogLabel}
-                  {banner.categoryLabel ? ` · ${banner.categoryLabel}` : null}
-                </p>
-                <h2 className="mt-4 font-display text-4xl leading-[0.95] tracking-wide text-white lg:text-5xl">
-                  {banner.name.toUpperCase()}
-                </h2>
-                {banner.capacity ? (
-                  <p className="mt-3 text-sm font-semibold uppercase tracking-[0.16em] text-white/80">
-                    {banner.capacity}
-                  </p>
-                ) : null}
-                {banner.description ? (
-                  <p className="mt-3 max-w-md text-base leading-relaxed text-white/85">
-                    {banner.description}
-                  </p>
-                ) : null}
+              <div className="pointer-events-auto mt-5 flex flex-wrap items-center gap-3 sm:mt-6">
                 <Link
-                  href={href}
-                  className="pointer-events-auto mt-6 inline-flex items-center gap-2 rounded-lg bg-orange px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-orange-hover"
+                  href={
+                    banner.productId
+                      ? `/productos/${banner.productId}`
+                      : "/productos"
+                  }
                   onClick={(event) => event.stopPropagation()}
+                  className="inline-flex h-11 items-center gap-2 rounded-full bg-orange px-4 text-sm font-medium text-white transition-colors hover:bg-orange-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
                 >
-                  Ver producto
-                  <ArrowRight className="h-4 w-4" />
+                  {banner.productId ? "Ver producto" : "Ver catálogo"}
+                  <ArrowRight className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
+                </Link>
+                <Link
+                  href="/cotizar"
+                  onClick={(event) => event.stopPropagation()}
+                  className="inline-flex h-11 items-center rounded-full border border-white/35 bg-black/20 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+                >
+                  Solicitar cotización
                 </Link>
               </div>
             </div>
@@ -203,7 +148,7 @@ function HeroBannerSlide({
 
 export default function HeroCarousel({ banners }: HeroCarouselProps) {
   const slides = useMemo(
-    () => (banners.length > 0 ? banners : DEFAULT_BANNERS),
+    () => (banners.length > 0 ? banners : DEFAULT_HERO_BANNERS),
     [banners],
   );
   const loopSlides = useMemo(() => buildLoopSlides(slides), [slides]);
@@ -219,12 +164,6 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
   const isBusyRef = useRef(false);
   const realActiveIndex = getRealSlideIndex(trackIndex, slideCount);
   const slideWidthPercent = loopSlideCount > 0 ? 100 / loopSlideCount : 100;
-
-  useEffect(() => {
-    setTrackIndex(slideCount > 1 ? 1 : 0);
-    setTransitionEnabled(true);
-    isBusyRef.current = false;
-  }, [slideCount]);
 
   useLayoutEffect(() => {
     if (transitionEnabled) {
@@ -325,8 +264,9 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
 
-    if (prefersReducedMotion) {
+    if (prefersReducedMotion || isMobile) {
       return;
     }
 
@@ -392,6 +332,7 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
     const deltaY = event.clientY - startY;
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
+    didSwipeRef.current = Math.max(absDeltaX, absDeltaY) > 8;
 
     if (absDeltaX >= SWIPE_THRESHOLD_PX && absDeltaX > absDeltaY) {
       didSwipeRef.current = true;
@@ -407,7 +348,7 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
   const onPointerCancel = () => {
     pointerStartXRef.current = null;
     pointerStartYRef.current = null;
-    didSwipeRef.current = false;
+    didSwipeRef.current = true;
   };
 
   const onCarouselClickCapture = (event: MouseEvent<HTMLDivElement>) => {
@@ -436,13 +377,20 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
         onBlur={() => setIsPaused(false)}
         tabIndex={0}
       >
-        <div className={`${CAROUSEL_CONTAINER_CLASS} bg-panel/40`}>
+        <div
+          className={`${CAROUSEL_CONTAINER_CLASS} hero-fade-bottom bg-panel/40`}
+        >
           <div
-            className="absolute inset-0 touch-pan-y overflow-hidden"
+            className="absolute inset-0 cursor-pointer touch-pan-y overflow-hidden"
             onPointerDown={onPointerDown}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerCancel}
             onClickCapture={onCarouselClickCapture}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("button, a")) return;
+              if (isBusyRef.current) return;
+              router.push(getSlideHref(slides[realActiveIndex]));
+            }}
           >
             <div
               className={`flex h-full ${
@@ -469,8 +417,10 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
             </div>
           </div>
 
+        </div>
+
           {slideCount > 1 ? (
-            <>
+            <div className="absolute bottom-3 left-1/2 z-30 flex max-w-[calc(100%-32px)] -translate-x-1/2 items-center gap-0.5 rounded-full border border-white/10 bg-black/35 px-2 backdrop-blur-md md:bottom-4 md:left-auto md:right-8 md:translate-x-0 md:p-1.5">
               <button
                 type="button"
                 onPointerDown={(event) => event.stopPropagation()}
@@ -478,10 +428,10 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
                   event.stopPropagation();
                   goPrev();
                 }}
-                className="absolute left-4 top-1/2 z-40 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white backdrop-blur-sm transition-colors hover:border-orange/60 hover:text-orange md:flex"
+                className="order-1 hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white md:flex"
                 aria-label="Slide anterior"
               >
-                <ChevronLeft className="h-6 w-6" strokeWidth={2.25} />
+                <ChevronLeft className="h-4 w-4" strokeWidth={1.75} />
               </button>
               <button
                 type="button"
@@ -490,13 +440,13 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
                   event.stopPropagation();
                   goNext();
                 }}
-                className="absolute right-4 top-1/2 z-40 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/50 text-white backdrop-blur-sm transition-colors hover:border-orange/60 hover:text-orange md:flex"
+                className="order-3 hidden h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-white md:flex"
                 aria-label="Slide siguiente"
               >
-                <ChevronRight className="h-6 w-6" strokeWidth={2.25} />
+                <ChevronRight className="h-4 w-4" strokeWidth={1.75} />
               </button>
 
-              <div className="pointer-events-auto absolute bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/45 px-3 py-2 backdrop-blur-sm">
+              <div className="order-2 flex min-w-0 flex-wrap items-center justify-center">
                 {slides.map((banner, index) => {
                   const isActive = index === realActiveIndex;
                   return (
@@ -507,20 +457,23 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
                         event.stopPropagation();
                         goToRealIndex(index);
                       }}
-                      className={`h-2 rounded-full transition-all ${
-                        isActive
-                          ? "w-6 bg-orange"
-                          : "w-2 bg-white/40 hover:bg-white/70"
-                      }`}
+                      className="flex h-6 w-6 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-white md:h-11"
                       aria-label={`Ir al slide ${index + 1}`}
                       aria-current={isActive ? "true" : undefined}
-                    />
+                    >
+                      <span
+                        className={`block h-1 rounded-full transition-all md:h-1.5 ${
+                          isActive
+                            ? "w-2.5 bg-white md:w-3"
+                            : "w-1 bg-white/40 hover:bg-white/70"
+                        }`}
+                      />
+                    </button>
                   );
                 })}
               </div>
-            </>
+            </div>
           ) : null}
-        </div>
       </div>
     </section>
   );

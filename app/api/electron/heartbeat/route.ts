@@ -41,11 +41,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const payload = normalizeElectronHeartbeatPayload(body);
-  const record = await recordElectronHeartbeat(payload);
+  try {
+    const payload = normalizeElectronHeartbeatPayload(body);
+    const record = await recordElectronHeartbeat(payload);
 
-  return electronJson({
-    ok: true,
-    lastSeenAt: record.lastSeenAt,
-  });
+    return electronJson({
+      ok: true,
+      lastSeenAt: record.lastSeenAt,
+    });
+  } catch (error) {
+    console.error("[electron/heartbeat POST]", error);
+    return electronJson(
+      { error: "Error interno al registrar heartbeat." },
+      { status: 500 },
+    );
+  }
 }

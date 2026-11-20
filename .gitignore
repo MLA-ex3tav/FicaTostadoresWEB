@@ -51,3 +51,6 @@ firebase-service-account.json
 
 .vercel
 .env*
+
+# Datos locales de desarrollo (modo sin Firebase)
+.local-data/

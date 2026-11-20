@@ -28,7 +28,9 @@ function getUpstashLimiter(config: RateLimitConfig): Ratelimit | null {
     if (!warnedUnavailable) {
       warnedUnavailable = true;
       console.error(
-        "[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN no configurados; rechazando solicitudes (fail-closed).",
+        process.env.NODE_ENV === "production"
+          ? "[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN no configurados; rechazando solicitudes (fail-closed)."
+          : "[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN no configurados; límites desactivados en desarrollo (fail-open).",
       );
     }
 
@@ -55,9 +57,13 @@ function getUpstashLimiter(config: RateLimitConfig): Ratelimit | null {
   return limiter;
 }
 
+/**
+ * Fail-open: si Upstash no responde (cuota agotada, red caída, etc.)
+ * dejamos pasar la solicitud en lugar de bloquear toda la web.
+ * El rate-limiter vuelve a funcionar cuando Upstash se recupera.
+ */
 const UNAVAILABLE_RESULT: RateLimitResult = {
-  ok: false,
-  retryAfterSeconds: 1,
+  ok: true,
   remaining: 0,
 };
 
@@ -68,6 +74,12 @@ export async function checkRateLimit(
   const limiter = getUpstashLimiter(config);
 
   if (!limiter) {
+    // En producción un rate-limiter ausente es un error de configuración:
+    // se cierra el paso en lugar de dejar la API sin protección.
+    if (process.env.NODE_ENV === "production") {
+      return { ok: false, retryAfterSeconds: 60, remaining: 0 };
+    }
+
     return UNAVAILABLE_RESULT;
   }
 
@@ -84,7 +96,7 @@ export async function checkRateLimit(
       remaining: result.remaining,
     };
   } catch (error) {
-    console.error("[rate-limit] Upstash falló; rechazando solicitud:", error);
+    console.error("[rate-limit] Upstash falló; dejando pasar (fail-open):", error);
     return UNAVAILABLE_RESULT;
   }
 }
@@ -114,6 +126,8 @@ export const RATE_LIMITS = {
   electronHeartbeat: { windowMs: 60_000, max: 120 },
   cotizacionesSubmit: { windowMs: 900_000, max: 5 },
   soporteTecnicoSubmit: { windowMs: 900_000, max: 5 },
+  operadorLogin: { windowMs: 900_000, max: 8 },
+  staffInviteRedeem: { windowMs: 900_000, max: 10 },
 } as const satisfies Record<string, RateLimitConfig>;
 
 export function getRateLimitKey(

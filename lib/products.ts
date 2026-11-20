@@ -8,6 +8,15 @@ export interface ProductAddOn {
   description: string;
 }
 
+/** Versión del mismo equipo (misma serie) con precio distinto, ej. con/sin software. */
+export interface ProductVariant {
+  id: string;
+  name: string;
+  description?: string;
+  price?: number;
+  priceUsd?: number;
+}
+
 export interface Product {
   id: string;
   catalog: ProductCatalog;
@@ -20,14 +29,14 @@ export interface Product {
   features: string[];
   technicalDetails: { label: string; value: string }[];
   addOns: ProductAddOn[];
+  /** Aplicaciones o productos que procesa (ej. Café, Avellanas, Trigo). */
+  applications?: string[];
   images?: ProductImage[];
   serie?: string;
+  variaciones?: ProductVariant[];
   isOutOfStock?: boolean;
   disableColors?: boolean;
   disabledColors?: string[];
-  isPromo?: boolean;
-  promoTag?: string;
-  promoDescription?: string;
   isFeatured?: boolean;
 }
 
@@ -37,7 +46,95 @@ const commercialDescription =
 const woodRoasterDescription =
   "Tostador comercial a leña, desarrollado principalmente para trigo y avellanas, preservando la tradición y el sabor de la harina tostada. Diseño económico en el uso de leña con chamiza o leña delgada.";
 
-export const defaultProducts: Product[] = [
+/** Aplicaciones por producto, usadas por el buscador del catálogo. */
+const APPLICATIONS_BY_PRODUCT_ID: Record<string, string[]> = {
+  "tlc-700g": ["Café"],
+  "tlc-3kg": ["Café"],
+  "tlc-5kg": ["Café"],
+  "tlc-10kg": ["Café"],
+  "comercial-1kg-gas": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "comercial-5kg-gas": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "comercial-10kg-gas": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "comercial-30kg-gas": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "comercial-5kg-lena": ["Trigo", "Avellanas", "Harina tostada"],
+  "comercial-10kg-lena": ["Trigo", "Avellanas", "Harina tostada"],
+  "comercial-30kg-lena": ["Trigo", "Avellanas", "Harina tostada"],
+  "industrial-50": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "industrial-100": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "industrial-200": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "industrial-300": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "industrial-500": [
+    "Maní",
+    "Avellanas",
+    "Almendras",
+    "Trigo",
+    "Semillas",
+    "Frutos secos",
+  ],
+  "partidor-avellanas": ["Avellanas"],
+  "partidor-seleccionador": ["Avellanas"],
+  "molino-martillo": ["Trigo", "Avellanas", "Avena", "Granos"],
+  "molino-piedra": ["Trigo", "Avellanas", "Harina tostada"],
+  "descascarador-europea": ["Avellanas"],
+};
+
+const baseProducts: Product[] = [
   // --- CAFÉ ---
   {
     id: "tlc-700g",
@@ -601,6 +698,11 @@ export const defaultProducts: Product[] = [
     addOns: [],
   },
 ];
+
+export const defaultProducts: Product[] = baseProducts.map((product) => ({
+  ...product,
+  applications: product.applications ?? APPLICATIONS_BY_PRODUCT_ID[product.id] ?? [],
+}));
 
 /** @deprecated Usar getProducts() async desde lib/products-server.ts */
 export const products = defaultProducts;

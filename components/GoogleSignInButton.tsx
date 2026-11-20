@@ -162,7 +162,7 @@ function GoogleSignInButtonVisual({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.98 }}
           transition={{ duration: motionDuration.fast, ease: motionEase }}
-          className="flex w-full items-center justify-center gap-3 rounded-xl border border-steel-dark/25 bg-surface/70 px-5 py-3.5 text-sm font-semibold tracking-wide text-steel-light shadow-sm transition-all hover:border-steel-mid/40 hover:bg-surface hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
+          className="flex w-full items-center justify-center gap-3 rounded-xl border border-steel-dark/25 bg-surface/70 px-5 py-3.5 text-sm font-semibold  text-steel-light shadow-sm transition-all hover:border-steel-mid/40 hover:bg-surface hover:-translate-y-0.5 hover:shadow-md active:translate-y-0"
         >
           {loading ? (
             <>

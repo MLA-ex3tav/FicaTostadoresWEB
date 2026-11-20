@@ -15,6 +15,13 @@ export interface CatalogConfig {
   categories: CategoryDefinition[];
 }
 
+/**
+ * Bucket para productos con catálogo pero sin categoría. Es una pseudo-categoría
+ * solo de filtrado; no existe en la config ni se guarda en Firestore.
+ */
+export const SIN_CATEGORIA_ID = "__sin_categoria__";
+export const SIN_CATEGORIA_LABEL = "Sin categoría";
+
 export const defaultCatalogConfig: CatalogConfig = {
   catalogs: [
     { id: "cafe", label: "Tostadores de café" },
@@ -61,6 +68,7 @@ export function getCategoryLabel(
   id: string,
   config: CatalogConfig = defaultCatalogConfig,
 ): string {
+  if (!id) return SIN_CATEGORIA_LABEL;
   return config.categories.find((category) => category.id === id)?.label ?? id;
 }
 

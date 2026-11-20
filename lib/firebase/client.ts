@@ -1,28 +1,14 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  type AppCheck,
+} from "firebase/app-check";
+import { getFirebaseConfig, isFirebaseConfigured } from "@/lib/firebase/config";
 
-function getFirebaseConfig() {
-  return {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim(),
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim(),
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim(),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim(),
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim(),
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim(),
-  };
-}
-
-export function isFirebaseConfigured(): boolean {
-  const config = getFirebaseConfig();
-
-  return Boolean(
-    config.apiKey &&
-      config.authDomain &&
-      config.projectId &&
-      config.appId,
-  );
-}
+export { isFirebaseConfigured } from "@/lib/firebase/config";
 
 export function getFirebaseApp(): FirebaseApp | null {
   if (!isFirebaseConfigured()) {
@@ -54,4 +40,37 @@ export function getFirebaseFirestore(): Firestore | null {
   }
 
   return getFirestore(app);
+}
+
+/**
+ * App Check (reCAPTCHA Enterprise).
+ *
+ * Solo se activa si existe NEXT_PUBLIC_RECAPTCHA_SITE_KEY (requiere crear una
+ * clave de reCAPTCHA Enterprise en Google Cloud). Sin la variable no hace nada,
+ * así la app funciona igual hasta configurarla.
+ */
+export function getAppCheckSiteKey(): string {
+  return process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim() ?? "";
+}
+
+let appCheckInstance: AppCheck | null = null;
+
+export function initAppCheck(): AppCheck | null {
+  if (appCheckInstance) {
+    return appCheckInstance;
+  }
+
+  const app = getFirebaseApp();
+  const siteKey = getAppCheckSiteKey();
+
+  if (!app || !siteKey) {
+    return null;
+  }
+
+  appCheckInstance = initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(siteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+
+  return appCheckInstance;
 }

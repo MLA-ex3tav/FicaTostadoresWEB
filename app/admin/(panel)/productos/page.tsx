@@ -20,20 +20,23 @@ export default async function AdminProductsPage() {
   const canPersist = canPersistProducts();
 
   return (
-    <div className="w-full px-4 py-8 sm:px-6 lg:px-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="w-full px-4 py-6 sm:px-6 lg:px-8 xl:px-10 space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.06] pb-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-steel-dark">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-steel-dark">
             Catálogo Industrial
           </p>
-          <h1 className="mt-1 font-display text-3xl font-bold tracking-wide text-steel-light">
-            Gestión de Productos ({products.length})
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            Gestión de <span className="text-orange">Productos</span>{" "}
+            <span className="ml-1 text-lg font-mono font-normal text-steel-mid sm:text-xl">
+              ({products.length})
+            </span>
           </h1>
         </div>
 
         <Link
           href="/admin/productos/nuevo"
-          className="inline-flex h-12 items-center gap-2 rounded-xl bg-orange px-5 text-sm font-semibold uppercase tracking-wider text-white transition-colors hover:bg-orange-hover shadow-lg shadow-orange/20"
+          className="inline-flex h-11 items-center gap-2 rounded-xl bg-orange px-5 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-orange-hover active:scale-[0.98]"
         >
           <Plus className="h-4 w-4" />
           Nuevo Producto
@@ -41,14 +44,14 @@ export default async function AdminProductsPage() {
       </div>
 
       {!canPersist && (
-        <p className="mt-6 rounded-lg border border-orange/30 bg-orange/10 px-4 py-3 text-sm text-orange">
+        <div className="rounded-xl border border-orange/20 bg-orange/10 p-4 text-xs text-orange">
           Firebase Admin no está configurado. Defina FIREBASE_SERVICE_ACCOUNT_JSON
           o FIREBASE_SERVICE_ACCOUNT_PATH en .env.local (y en Vercel en
           producción). Sin eso solo puede ver el catálogo.
-        </p>
+        </div>
       )}
 
-      <div className="mt-8">
+      <div>
         <AdminProductsTable
           products={products}
           catalogConfig={catalogConfig}

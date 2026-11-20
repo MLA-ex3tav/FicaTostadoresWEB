@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { requireStaffApi } from "@/lib/admin-api-guard";
-import { PRODUCTOS_COLLECTION } from "@/lib/catalog/constants";
+import {
+  PRODUCTOS_COLLECTION,
+  PRODUCTOS_PRECIOS_COLLECTION,
+} from "@/lib/catalog/constants";
 import { FIREBASE_ADMIN_NOT_CONFIGURED_MESSAGE } from "@/lib/firebase-admin-config";
 import { getFirebaseAdminFirestore } from "@/lib/firebase-admin";
 import { mapSeriesGroup } from "@/lib/products/excel-import";
@@ -166,12 +169,14 @@ export async function POST(request: Request) {
   }
 
   const collection = db.collection(PRODUCTOS_COLLECTION);
+  const pricesCollection = db.collection(PRODUCTOS_PRECIOS_COLLECTION);
   const batch = db.batch();
   let created = 0;
   let updated = 0;
 
   for (const row of rows) {
     const ref = collection.doc(row.id);
+    const pricesRef = pricesCollection.doc(row.id);
     const snapshot = await ref.get();
 
     const mapping = mapSeriesGroup(row.group, row.name);
@@ -187,10 +192,15 @@ export async function POST(request: Request) {
       };
 
       if (row.price !== null) {
-        update.listPrice = row.price;
-        update.price = row.price;
-        update.precio = row.price;
-        update.priceUpdatedAt = FieldValue.serverTimestamp();
+        batch.set(
+          pricesRef,
+          {
+            listPrice: row.price,
+            priceUpdatedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
       }
 
       if (
@@ -217,15 +227,19 @@ export async function POST(request: Request) {
         addOns: [],
         images: [],
         serie: row.serie,
-        listPrice: row.price,
-        price: row.price,
-        precio: row.price,
-        priceUpdatedAt:
-          row.price !== null ? FieldValue.serverTimestamp() : null,
         updatedAt: FieldValue.serverTimestamp(),
       };
 
       batch.set(ref, doc);
+
+      if (row.price !== null) {
+        batch.set(pricesRef, {
+          listPrice: row.price,
+          priceUpdatedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      }
+
       created += 1;
     }
   }

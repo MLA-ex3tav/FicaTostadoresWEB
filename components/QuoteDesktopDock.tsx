@@ -33,8 +33,12 @@ export default function QuoteDesktopDock() {
   const productCount = products.length;
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 hidden md:block">
-      <div className="w-[17.5rem] overflow-hidden rounded-xl border border-white/[0.1] bg-[var(--input-bg)] shadow-[0_6px_24px_rgba(0,0,0,0.35)] motion-reduce:transition-none">
+    <div
+      className="fixed bottom-6 right-6 z-40 hidden md:block"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <div className="w-[22rem] overflow-hidden rounded-lg border border-white/10 bg-[#16181c] shadow-lg motion-reduce:transition-none">
         <div
           className={`grid motion-reduce:transition-none ${dockDuration} ease-[cubic-bezier(0.32,0.72,0,1)] ${
             open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
@@ -75,14 +79,14 @@ export default function QuoteDesktopDock() {
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:text-orange"
-                aria-expanded={false}
+                className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:text-white"
+                aria-expanded={open}
                 aria-label={`Expandir cotización (${productCount} ${productCount === 1 ? "producto" : "productos"})`}
               >
-                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-orange">
+                <span className="text-xs font-medium   text-steel-mid">
                   Cotización
                 </span>
-                <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-orange/15 px-1.5 text-xs font-semibold tabular-nums text-orange">
+                <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] px-1.5 text-xs font-medium tabular-nums text-steel-light">
                   {productCount}
                 </span>
                 <ChevronUp
@@ -95,7 +99,7 @@ export default function QuoteDesktopDock() {
 
               <Link
                 href="/contacto"
-                className="shrink-0 rounded-lg border border-orange/40 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-orange transition-colors hover:border-orange hover:bg-orange/10"
+                className="shrink-0 rounded-lg border border-white/[0.1] px-2.5 py-1.5 text-xs font-medium text-steel-mid transition-colors hover:border-orange hover:text-white"
               >
                 Cotizar
               </Link>

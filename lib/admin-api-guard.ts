@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isLocalDevMode } from "@/lib/local-dev/mode";
 import {
   requireStaffSession,
   requireSuperAdminSession,
@@ -68,6 +69,10 @@ export async function requireStaffApi(
       ok: false,
       response: NextResponse.json({ error: "No autorizado" }, { status: 401 }),
     };
+  }
+
+  if (isLocalDevMode()) {
+    return { ok: true, session };
   }
 
   const rateLimitFailure = await enforceRateLimit(request, session, scope);

@@ -10,9 +10,9 @@ import { NextResponse } from "next/server";
 export function electronCorsHeaders(): HeadersInit {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Operador-Token",
+    "Access-Control-Max-Age": "600",
   };
 }
 

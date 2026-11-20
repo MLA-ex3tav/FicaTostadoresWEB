@@ -1,46 +1,47 @@
 import {
-  defaultCatalogConfig,
   getCatalogLabel,
   getCategoryLabel,
 } from "@/lib/catalog-config";
+import { getCatalogConfig } from "@/lib/catalog-config-server";
 import type { HeroProductBanner } from "@/lib/images";
 import {
   CAROUSEL_DEFAULT_FOCUS,
   getCarouselImageSrc,
 } from "@/lib/product-images";
 import { loadProducts } from "@/lib/products-repository";
+import type { Product } from "@/lib/products";
+
+const MAX_HERO_BANNERS = 6;
 
 export async function getHeroProductBanners(): Promise<HeroProductBanner[]> {
-  const products = await loadProducts();
-  const banners: HeroProductBanner[] = [];
+  const [products, catalogConfig] = await Promise.all([
+    loadProducts(),
+    getCatalogConfig(),
+  ]);
 
-  for (const product of products) {
+  const withImage = products.filter((product) => {
+    const src = getCarouselImageSrc(product.images?.[0]);
+    return Boolean(src);
+  });
+
+  const featured = withImage.filter((product) => product.isFeatured);
+  const selected = [
+    ...featured,
+    ...withImage.filter((product) => !product.isFeatured),
+  ].slice(0, MAX_HERO_BANNERS);
+
+  return selected.map((product: Product) => {
     const primaryImage = product.images?.[0];
-    const src = getCarouselImageSrc(primaryImage);
-    if (!src) {
-      continue;
-    }
 
-    banners.push({
+    return {
       productId: product.id,
-      src,
+      src: getCarouselImageSrc(primaryImage) ?? "",
       name: product.name,
       capacity: product.capacity,
       description: product.description,
-      technicalDetails: product.technicalDetails.slice(0, 6),
-      features: product.features.slice(0, 4),
-      categoryLabel: getCategoryLabel(product.category, defaultCatalogConfig),
-      catalogLabel: getCatalogLabel(product.catalog, defaultCatalogConfig),
+      categoryLabel: getCategoryLabel(product.category, catalogConfig),
+      catalogLabel: getCatalogLabel(product.catalog, catalogConfig),
       carouselFocus: primaryImage?.carousel.focus ?? CAROUSEL_DEFAULT_FOCUS,
-      isPromo: product.isPromo,
-      promoTag: product.promoTag,
-    });
-  }
-
-  // Promos first so discounted machines show at the start of the banner.
-  banners.sort(
-    (a, b) => Number(Boolean(b.isPromo)) - Number(Boolean(a.isPromo)),
-  );
-
-  return banners;
+    };
+  });
 }

@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+.next
+.local-data
+node_modules
+*.log
+dev-*.log

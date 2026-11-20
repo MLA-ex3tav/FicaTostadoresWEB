@@ -4,6 +4,7 @@ import {
   DEFAULT_PRODUCT_COLOR_ID,
   getProductColorLabel,
 } from "@/lib/product-colors";
+import { getProductImageSrc } from "@/lib/product-images";
 import type { QuoteProductAddOn, QuoteProductItem } from "@/lib/quote-selection";
 
 export function mapAddOnsForQuote(
@@ -19,9 +20,16 @@ export function mapAddOnsForQuote(
 }
 
 export function buildQuoteProductItem(
-  product: Pick<Product, "id" | "name" | "capacity" | "addOns">,
+  product: Pick<Product, "id" | "name" | "capacity" | "addOns"> & {
+    images?: Product["images"];
+    image?: string | null;
+  },
   selectedAddOnIds: string[],
   color?: {
+    id?: string | null;
+    name?: string | null;
+  } | null,
+  variant?: {
     id?: string | null;
     name?: string | null;
   } | null,
@@ -33,13 +41,20 @@ export function buildQuoteProductItem(
     getProductColorLabel(selectedColorId) ||
     getProductColorLabel(DEFAULT_PRODUCT_COLOR_ID);
 
+  const variacionId = variant?.id?.trim() || null;
+  const variacionName = variant?.name?.trim() || null;
+
   return {
     id: product.id,
     name: product.name,
     capacity: product.capacity,
+    image:
+      product.image ?? getProductImageSrc(product.images?.[0]) ?? null,
     selectedColor,
     selectedColorId,
     selectedAddOns,
+    variacionId,
+    variacionName,
   };
 }
 
@@ -58,9 +73,17 @@ export function enrichCotizacionProductLine(
     };
   });
 
+  const catalogVariant = line.variacionId
+    ? catalogProduct?.variaciones?.find(
+        (variant) => variant.id === line.variacionId,
+      )
+    : undefined;
+
   return {
     ...line,
     selectedAddOns,
+    variacionId: line.variacionId,
+    variacionName: catalogVariant?.name ?? line.variacionName ?? null,
   };
 }
 

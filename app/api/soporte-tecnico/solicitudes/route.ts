@@ -3,6 +3,8 @@ import {
   createSolicitudSoporteTecnico,
   SoporteTecnicoRepositoryError,
 } from "@/lib/soporte-tecnico/repository";
+import { enviarNotificacionNuevaSolicitud } from "@/lib/fcm";
+import { isLocalDevMode } from "@/lib/local-dev/mode";
 import { parseCreateSolicitudSoporteTecnicoInput } from "@/lib/validation/soporte-tecnico-input";
 import {
   parseJsonBody,
@@ -29,6 +31,16 @@ export async function POST(request: Request) {
 
   try {
     const { id } = await createSolicitudSoporteTecnico(input);
+
+    // Completa el envío antes de finalizar la invocación del servidor.
+    if (!isLocalDevMode()) {
+      await enviarNotificacionNuevaSolicitud({
+        tipo: "soporte",
+        id,
+        cliente: input.name,
+        resumen: input.issueCategory,
+      });
+    }
 
     return NextResponse.json(
       {

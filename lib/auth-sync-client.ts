@@ -3,37 +3,10 @@
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { CLIENTES_COLLECTION } from "@/lib/firestore-collections";
-import {
-  canManageUsers,
-  isStaffRole,
-  isSuperAdminRole,
-  type UserRole,
-} from "@/lib/permissions";
+import { parseUserRole, type UserRole } from "@/lib/permissions";
 import type { ClienteShippingProfile } from "@/lib/shipping-profile";
 import { readClienteShippingProfile, sanitizeClienteShippingProfile } from "@/lib/shipping-profile";
 import { getFirebaseFirestore } from "@/lib/firebase/client";
-
-interface ClienteRecord {
-  role?: UserRole;
-  shippingProfile?: unknown;
-}
-
-export async function getClienteRole(uid: string): Promise<UserRole | null> {
-  const db = getFirebaseFirestore();
-
-  if (!db) {
-    return null;
-  }
-
-  const snapshot = await getDoc(doc(db, CLIENTES_COLLECTION, uid));
-
-  if (!snapshot.exists()) {
-    return null;
-  }
-
-  const data = snapshot.data() as ClienteRecord;
-  return data.role ?? null;
-}
 
 export async function getClienteShippingProfile(
   uid: string,
@@ -79,71 +52,174 @@ export async function saveClienteShippingProfile(
   );
 }
 
-export async function upsertClienteClient(user: User): Promise<void> {
-  const db = getFirebaseFirestore();
+interface AuthSessionResponse {
+  role?: string | null;
+  isStaff?: boolean;
+  isAdmin?: boolean;
+}
 
-  if (!db || !user.email) {
+interface AuthSession {
+  role: UserRole | null;
+  isStaff: boolean;
+  isAdmin: boolean;
+  verificationError?: string;
+}
+
+interface CachedAuthSession extends AuthSession {
+  uid: string;
+  expiresAt: number;
+}
+
+const SESSION_CACHE_KEY = "fica-auth-session";
+const SESSION_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readCachedAuthSession(uid: string): AuthSession | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_CACHE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<CachedAuthSession> | null;
+
+    if (
+      !parsed ||
+      parsed.uid !== uid ||
+      typeof parsed.expiresAt !== "number" ||
+      Date.now() >= parsed.expiresAt
+    ) {
+      clearAuthSessionCache();
+      return null;
+    }
+
+    return {
+      role: parseUserRole(parsed.role ?? null),
+      isStaff: Boolean(parsed.isStaff),
+      isAdmin: Boolean(parsed.isAdmin),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAuthSession(uid: string, session: AuthSession): void {
+  if (typeof window === "undefined") {
     return;
   }
 
-  const ref = doc(db, CLIENTES_COLLECTION, user.uid);
-  const existing = await getDoc(ref);
+  try {
+    const cached: CachedAuthSession = {
+      ...session,
+      uid,
+      expiresAt: Date.now() + SESSION_CACHE_TTL_MS,
+    };
+    window.sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(cached));
+  } catch {
+    // sessionStorage puede no estar disponible.
+  }
+}
 
-  const profile = {
-    uid: user.uid,
-    email: user.email.toLowerCase(),
-    displayName: user.displayName,
-    photoURL: user.photoURL,
-    lastLoginAt: serverTimestamp(),
+export function clearAuthSessionCache(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.removeItem(SESSION_CACHE_KEY);
+  } catch {
+    // Ignorar.
+  }
+}
+
+async function fetchAuthSession(
+  user: User,
+): Promise<AuthSession> {
+  const token = await user.getIdToken();
+  const response = await fetch("/api/auth/me", {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as
+      | { error?: unknown }
+      | null;
+    return {
+      role: null,
+      isStaff: false,
+      isAdmin: false,
+      verificationError:
+        typeof body?.error === "string"
+          ? body.error
+          : "No se pudo verificar el acceso de equipo en este momento. Inténtalo nuevamente más tarde.",
+    };
+  }
+
+  const data = (await response.json()) as AuthSessionResponse;
+  const role = parseUserRole(data.role ?? null);
+
+  return {
+    role,
+    isStaff: Boolean(data.isStaff) && user.emailVerified,
+    isAdmin: Boolean(data.isAdmin) && user.emailVerified,
   };
+}
 
-  if (existing.exists()) {
-    await setDoc(ref, profile, { merge: true });
-    return;
+async function syncStaffSessionCookie(user: User): Promise<void> {
+  try {
+    const token = await user.getIdToken(true);
+    const response = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "same-origin",
+    });
+
+    if (!response.ok) {
+      console.warn(
+        "[auth-sync] no se pudo crear la sesión de staff:",
+        response.status,
+      );
+    }
+  } catch (error) {
+    console.warn("[auth-sync] no se pudo crear la sesión de staff:", error);
   }
-
-  await setDoc(
-    ref,
-    {
-      ...profile,
-      role: "cliente" satisfies UserRole,
-      createdAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
-}
-
-export async function isStaffClient(uid: string): Promise<boolean> {
-  const role = await getClienteRole(uid);
-  return isStaffRole(role);
-}
-
-export async function isSuperAdminClient(uid: string): Promise<boolean> {
-  const role = await getClienteRole(uid);
-  return isSuperAdminRole(role);
-}
-
-/** @deprecated Use isSuperAdminClient */
-export async function isAdminClient(uid: string): Promise<boolean> {
-  return isSuperAdminClient(uid);
 }
 
 export async function syncAuthSessionClient(
   user: User,
-): Promise<{ role: UserRole | null; isStaff: boolean; isAdmin: boolean }> {
-  await upsertClienteClient(user);
-  const role = await getClienteRole(user.uid);
+): Promise<AuthSession> {
+  const cached = readCachedAuthSession(user.uid);
 
-  const isStaff = isStaffRole(role) && user.emailVerified;
-  const isAdmin = isSuperAdminRole(role) && user.emailVerified;
+  if (cached) {
+    return cached;
+  }
 
-  return {
-    role,
-    isStaff,
-    isAdmin,
-  };
-}
+  try {
+    const session = await fetchAuthSession(user);
 
-export function canManageUsersClient(role: UserRole | null): boolean {
-  return canManageUsers(role);
+    if (session.verificationError) {
+      return session;
+    }
+
+    if (session.isStaff) {
+      await syncStaffSessionCookie(user);
+    }
+
+    writeCachedAuthSession(user.uid, session);
+    return session;
+  } catch (error) {
+    console.error("[auth-sync] no se pudo consultar la sesión al servidor:", error);
+    return {
+      role: null,
+      isStaff: false,
+      isAdmin: false,
+      verificationError:
+        "No se pudo verificar el acceso de equipo. Revisa tu conexión e inténtalo nuevamente.",
+    };
+  }
 }

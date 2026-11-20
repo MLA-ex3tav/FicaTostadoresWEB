@@ -1,67 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, MessageSquare, ShieldCheck, Sparkles } from "lucide-react";
-import { buildQuoteWhatsAppUrl, openWhatsAppContact } from "@/lib/quoting";
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import GranoDecor from "@/components/GranoDecor";
 import Reveal from "@/components/motion/Reveal";
 
 export default function HomeCtaBanner() {
-  const handleWhatsAppClick = () => {
-    const url = buildQuoteWhatsAppUrl(
-      "Cliente Web",
-      "",
-      "Hola Fica Tostadores, me gustaría recibir asesoría técnica y cotización para un tostador:",
-    );
-    openWhatsAppContact(url);
-  };
-
   return (
-    <section className="border-t border-white/[0.08] bg-panel/90 py-16 md:py-24 relative overflow-hidden">
-      {/* Background Ambient Glow */}
-      <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[40rem] h-[20rem] bg-orange/15 rounded-full blur-3xl pointer-events-none" />
+    <section className="relative isolate overflow-hidden border-t border-white/[0.06] py-16 md:py-24">
+      <GranoDecor
+        variant="grano2"
+        className="right-[4%] top-1/2 hidden w-64 -translate-y-1/2 rotate-12 md:block lg:w-80"
+        opacity={0.1}
+      />
+      <GranoDecor
+        variant="grano"
+        className="bottom-8 right-[38%] hidden w-20 -rotate-12 md:block"
+        opacity={0.07}
+      />
+      <GranoDecor
+        variant="grano"
+        className="bottom-4 right-[12%] hidden w-14 rotate-45 md:block"
+        opacity={0.05}
+      />
 
-      <div className="mx-auto max-w-5xl px-4 md:px-6 text-center relative z-10 space-y-6">
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
         <Reveal>
-          <div className="inline-flex items-center gap-2 rounded-full border border-orange/40 bg-orange/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-orange">
-            <Sparkles className="h-4 w-4" />
-            <span>Fábrica Directa en Chile</span>
-          </div>
-
-          <h2 className="mt-4 font-display text-4xl sm:text-5xl font-bold tracking-wide text-steel-light">
-            ¿LISTO PARA POTENCIAR <span className="text-orange">TU TOSTADURÍA?</span>
+          <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            Encuentra el equipo para tu producción
           </h2>
 
-          <p className="mx-auto max-w-2xl text-base text-steel-mid leading-relaxed">
-            Diseñamos y fabricamos maquinaria a medida con garantía de 2 años, repuestos originales inmediatos y respaldo de ingeniería nacional.
-          </p>
-
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-steel-mid">Selecciona los equipos que necesitas y solicita una cotización a nuestro equipo.</p>
+          <div className="pt-8 flex items-center">
             <Link
               href="/cotizar"
-              className="inline-flex h-14 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-orange px-8 text-sm font-semibold uppercase tracking-wider text-white transition-all hover:bg-orange-hover shadow-lg shadow-orange/20"
+              className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-3 rounded-full bg-orange px-6 text-sm font-semibold text-white transition-colors hover:bg-orange-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange"
             >
-              Solicitar Cotización Ahora
-              <ArrowRight className="h-5 w-5" />
+              Solicitar cotización
+              <ArrowRight className="h-4 w-4" />
             </Link>
-
-            <button
-              type="button"
-              onClick={handleWhatsAppClick}
-              className="inline-flex h-14 w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-emerald-500/50 bg-emerald-500/10 px-8 text-sm font-semibold uppercase tracking-wider text-emerald-400 transition-all hover:bg-emerald-500/20"
-            >
-              <MessageSquare className="h-5 w-5" />
-              Asesoría por WhatsApp
-            </button>
           </div>
 
-          {/* Guarantee Badges */}
-          <div className="pt-8 flex flex-wrap items-center justify-center gap-6 text-xs text-steel-mid">
+          <div className="pt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-steel-mid">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-orange" />
+              <ShieldCheck className="h-4 w-4 text-steel-dark" />
               Garantía de 2 años en estructura y tambor
             </span>
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-orange" />
+              <ShieldCheck className="h-4 w-4 text-steel-dark" />
               Repuestos 100% disponibles en Chile
             </span>
           </div>

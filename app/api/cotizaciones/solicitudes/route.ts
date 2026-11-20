@@ -3,6 +3,8 @@ import {
   CotizacionesRepositoryError,
   createSolicitudCotizacion,
 } from "@/lib/cotizaciones/repository";
+import { enviarNotificacionNuevaSolicitud } from "@/lib/fcm";
+import { isLocalDevMode } from "@/lib/local-dev/mode";
 import {
   parseCreateSolicitudCotizacionInput,
 } from "@/lib/validation/cotizacion-input";
@@ -31,6 +33,16 @@ export async function POST(request: Request) {
 
   try {
     const { id } = await createSolicitudCotizacion(input);
+
+    // Completa el envío antes de finalizar la invocación del servidor.
+    if (!isLocalDevMode()) {
+      await enviarNotificacionNuevaSolicitud({
+        tipo: "cotizacion",
+        id,
+        cliente: input.name,
+        resumen: input.products[0]?.name,
+      });
+    }
 
     return NextResponse.json(
       {

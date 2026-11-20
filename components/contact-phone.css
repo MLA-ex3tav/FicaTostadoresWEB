@@ -9,63 +9,27 @@
 }
 
 .PhoneInputCountry {
-  position: relative;
-  flex: 0 0 auto;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  padding: 0;
-  display: flex;
-  align-items: center;
-}
-
-.PhoneInputCountry > .PhoneInputCountryIcon,
-.PhoneInputCountrySelect,
-.PhoneInputCountrySelectArrow {
-  display: none !important;
-}
-
-.phone-country-select__flag svg,
-.phone-country-select__flag img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}
-
-.phone-country-select__chevron {
-  flex: none;
-}
-
-.PhoneInputCountryIcon {
-  width: 1.25rem;
-  height: 0.875rem;
-  object-fit: cover;
-}
-
-.PhoneInputCountryIcon--border {
-  box-shadow: none;
-  background: transparent;
+  display: none;
 }
 
 .PhoneInputInput {
   box-sizing: border-box;
   flex: 1;
   min-width: 0;
-  height: 2.75rem;
-  border-radius: var(--radius-md);
-  background: var(--input-bg);
-  border: 1px solid rgba(200, 205, 212, 0.25);
-  color: var(--foreground);
-  padding: 0.75rem 1rem;
-  font-size: 0.9375rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--steel-light);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .PhoneInputInput:focus {
   outline: none;
-  border-color: var(--orange);
-  box-shadow: 0 0 0 2px rgba(232, 93, 4, 0.2);
+  border-color: rgba(232, 93, 4, 0.6);
+  box-shadow: 0 0 0 1px rgba(232, 93, 4, 0.3);
 }
 
 .PhoneInputInput::placeholder {
@@ -75,15 +39,36 @@
 @media (max-width: 767px) {
   .PhoneInput,
   .phone-input-wrapper {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    display: flex;
   }
 
   .PhoneInputInput {
     width: 100%;
     max-width: 100%;
-    height: auto;
-    min-height: 3rem;
-    font-size: 1rem;
+    height: 3rem;
+    font-size: 0.875rem;
   }
+}
+
+/* Minimalist sleek scrollbar for country list */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }

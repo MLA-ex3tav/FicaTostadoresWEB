@@ -1,10 +1,7 @@
-import { CLIENTES_COLLECTION } from "@/lib/firestore-collections";
-import {
-  isStaffRole,
-  isSuperAdminRole,
-  parseUserRole,
-  type UserRole,
-} from "@/lib/permissions";
+import type { UserRole } from "@/lib/permissions";
+import { getFirebaseAdminAuth } from "@/lib/firebase-admin";
+import { isLocalDevMode } from "@/lib/local-dev/mode";
+import { getStaffRole } from "@/lib/staff/repository";
 
 export interface FirebaseUserSession {
   uid: string;
@@ -24,130 +21,54 @@ function getBearerToken(request: Request): string | null {
   return header.slice(7).trim();
 }
 
-function getFirebaseApiKey(): string | null {
-  return process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim() ?? null;
-}
-
-function getFirebaseProjectId(): string | null {
-  return process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ?? null;
-}
-
-interface IdentityToolkitUser {
-  localId?: string;
-  email?: string;
-  displayName?: string;
-  photoUrl?: string;
-  emailVerified?: boolean;
-}
-
-interface IdentityToolkitResponse {
-  users?: IdentityToolkitUser[];
-}
-
+/**
+ * Verifica el ID token localmente con Firebase Admin (firma y claims), sin
+ * llamar a Identity Toolkit en cada request.
+ */
 export async function verifyFirebaseUser(
   request: Request,
 ): Promise<FirebaseUserSession | null> {
-  const token = getBearerToken(request);
-  const apiKey = getFirebaseApiKey();
+  if (isLocalDevMode()) {
+    return {
+      uid: "localdev0001",
+      email: "local@fica.local",
+      displayName: "Desarrollo local",
+      photoURL: null,
+      emailVerified: true,
+    };
+  }
 
-  if (!token || !apiKey) {
+  const token = getBearerToken(request);
+  const auth = await getFirebaseAdminAuth();
+
+  if (!token || !auth) {
     return null;
   }
 
   try {
-    const response = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: token }),
-      },
-    );
+    const decoded = await auth.verifyIdToken(token);
 
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = (await response.json()) as IdentityToolkitResponse;
-    const account = data.users?.[0];
-
-    if (!account?.localId || !account.email) {
+    if (!decoded.uid) {
       return null;
     }
 
     return {
-      uid: account.localId,
-      email: account.email,
-      displayName: account.displayName ?? null,
-      photoURL: account.photoUrl ?? null,
-      emailVerified: Boolean(account.emailVerified),
+      uid: decoded.uid,
+      email: decoded.email ?? "",
+      displayName: decoded.name ?? null,
+      photoURL: decoded.picture ?? null,
+      emailVerified: Boolean(decoded.email_verified),
     };
   } catch {
     return null;
   }
 }
 
-interface FirestoreStringValue {
-  stringValue?: string;
-}
-
-interface FirestoreDocument {
-  fields?: {
-    role?: FirestoreStringValue;
-  };
-}
-
-export async function getClienteRoleFromRest(
+/** Rol efectivo del usuario: `staff` es la única fuente de verdad. */
+export async function getUserRoleFromStaff(
   uid: string,
-  idToken: string,
-): Promise<string | null> {
-  const projectId = getFirebaseProjectId();
-
-  if (!projectId) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${CLIENTES_COLLECTION}/${uid}`,
-      {
-        headers: { Authorization: `Bearer ${idToken}` },
-      },
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = (await response.json()) as FirestoreDocument;
-    return data.fields?.role?.stringValue ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export async function getUserRoleFromRest(
-  uid: string,
-  idToken: string,
 ): Promise<UserRole | null> {
-  const role = await getClienteRoleFromRest(uid, idToken);
-  return parseUserRole(role);
-}
-
-export async function isStaffFromRest(
-  uid: string,
-  idToken: string,
-): Promise<boolean> {
-  const role = await getUserRoleFromRest(uid, idToken);
-  return isStaffRole(role);
-}
-
-export async function isAdminFromRest(
-  uid: string,
-  idToken: string,
-): Promise<boolean> {
-  const role = await getUserRoleFromRest(uid, idToken);
-  return isSuperAdminRole(role);
+  return getStaffRole(uid);
 }
 
 export function getRequestIdToken(request: Request): string | null {

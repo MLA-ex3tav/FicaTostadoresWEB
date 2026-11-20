@@ -1,0 +1,27 @@
+# Fica Tostadores
+
+> Empresa chilena (Empresas Fica Tostadores Ltda.) dedicada al diseño y fabricación de maquinaria industrial y comercial para el tostado de café: tostadores TLC, molinos, partidores, descascaradores y equipos de procesamiento. Sede en Ruta Huichahue Km. 20, Padre Las Casas, IX Región de La Araucanía, Chile.
+
+## Secciones principales
+
+- [Inicio](https://www.tostadoresfica.cl/): presentación de la empresa, proceso de fabricación y servicios.
+- [Productos](https://www.tostadoresfica.cl/productos): catálogo completo de tostadores y equipos, con fichas técnicas por producto.
+- [Cotizar](https://www.tostadoresfica.cl/cotizar): solicitud de cotización personalizada de maquinaria.
+- [Contacto](https://www.tostadoresfica.cl/contacto): datos de contacto y formulario de cotización.
+- [Servicio técnico](https://www.tostadoresfica.cl/servicio-tecnico): soporte, mantenimiento y repuestos.
+- [Política de privacidad](https://www.tostadoresfica.cl/privacidad)
+- [Términos y condiciones](https://www.tostadoresfica.cl/terminos)
+
+## Contacto
+
+- Correo: tostadoresfica@gmail.com
+- Ventas: ventas@tostadoresfica.cl
+- WhatsApp / Teléfono: +56 9 8508 8171
+- Instagram: https://www.instagram.com/fica_tostadores.cl/
+- YouTube: https://www.youtube.com/@tostadoresfica
+- Facebook: https://www.facebook.com/tostadoresfica
+
+## Notas
+
+- Sitio en español (es-CL). Precios y disponibilidad se entregan por cotización directa.
+- El contenido del catálogo se actualiza periódicamente desde el panel de administración.

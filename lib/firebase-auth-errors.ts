@@ -1,10 +1,31 @@
-import { FirebaseError } from "firebase/app";
+function getErrorCode(error: unknown): string | null {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === "string" ? code : null;
+  }
+
+  return null;
+}
+
+function getErrorMessage(error: unknown): string | null {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    return typeof message === "string" ? message : null;
+  }
+
+  return null;
+}
 
 export function isAuthFlowCancelled(error: unknown): boolean {
+  const code = getErrorCode(error);
+
   return (
-    error instanceof FirebaseError &&
-    (error.code === "auth/popup-closed-by-user" ||
-      error.code === "auth/cancelled-popup-request")
+    code === "auth/popup-closed-by-user" ||
+    code === "auth/cancelled-popup-request"
   );
 }
 
@@ -13,8 +34,10 @@ export function isAuthFlowCancelled(error: unknown): boolean {
  * correo está registrado para evitar enumeración de cuentas.
  */
 function getEmailPasswordErrorMessage(error: unknown): string {
-  if (error instanceof FirebaseError) {
-    switch (error.code) {
+  const code = getErrorCode(error);
+
+  if (code) {
+    switch (code) {
       case "auth/invalid-credential":
       case "auth/user-not-found":
       case "auth/wrong-password":
@@ -37,27 +60,25 @@ function getEmailPasswordErrorMessage(error: unknown): string {
       case "auth/insufficient-permission":
         return "No dispone de permisos para realizar esta acción. Verifique el rol del usuario.";
       default:
-        return error.message;
+        return getErrorMessage(error) ?? "No se pudo completar la operación.";
     }
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "No se pudo completar la operación.";
+  return getErrorMessage(error) ?? "No se pudo completar la operación.";
 }
 
 /**
  * Mensajes específicos para el flujo de Google.
  */
 export function getGoogleAuthErrorMessage(error: unknown): string {
-  if (error instanceof FirebaseError) {
+  const code = getErrorCode(error);
+
+  if (code) {
     if (isAuthFlowCancelled(error)) {
       return "";
     }
 
-    switch (error.code) {
+    switch (code) {
       case "auth/unauthorized-domain":
         return "Dominio no autorizado en Firebase. En Authentication → Configuración → Dominios autorizados, agregue localhost y, si usa la red local, su IP (ej. 192.168.3.107).";
       case "auth/popup-blocked":
@@ -69,15 +90,11 @@ export function getGoogleAuthErrorMessage(error: unknown): string {
       case "auth/invalid-credential":
         return "Credenciales de Google inválidas en Firebase. En Firebase Console → Authentication → Sign-in method → Google, verifique que el Web client secret coincida con Google Cloud Console → Credentials (OAuth 2.0). Si lo regeneró, vuelva a pegarlo en Firebase o desactive y reactive el proveedor Google.";
       default:
-        return error.message;
+        return getErrorMessage(error) ?? "No se pudo iniciar sesión con Google.";
     }
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "No se pudo iniciar sesión con Google.";
+  return getErrorMessage(error) ?? "No se pudo iniciar sesión con Google.";
 }
 
 /**
@@ -95,13 +112,9 @@ export function getFirebaseAuthErrorMessage(
     return getGoogleAuthErrorMessage(error);
   }
 
-  if (error instanceof FirebaseError) {
+  if (getErrorCode(error)) {
     return getGoogleAuthErrorMessage(error);
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "No se pudo iniciar sesión.";
+  return getErrorMessage(error) ?? "No se pudo iniciar sesión.";
 }

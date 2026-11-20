@@ -1,29 +1,47 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import ClientePerfilContent from "@/components/ClientePerfilContent";
+import Reveal from "@/components/motion/Reveal";
 import SectionHeader from "@/components/SectionHeader";
+import { buildMetadata } from "@/lib/seo";
 
-export const metadata = {
-  title: "Mi perfil | Fica Tostadores",
+export const metadata = buildMetadata({
+  title: "Mi perfil",
   description:
-    "Revise el estado de sus solicitudes de cotización en Fica Tostadores.",
-};
+    "Gestione su cuenta de usuario y datos de acceso en Fica Tostadores.",
+  path: "/perfil",
+  noindex: true,
+});
 
 export default function PerfilPage() {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-16 md:px-6 md:py-24">
-      <div className="mb-10">
-        <SectionHeader
-          as="h1"
-          eyebrow="Cuenta"
-          title={
-            <>
-              MI <span className="text-orange">PERFIL</span>
-            </>
-          }
-          description="Aquí puede ver los equipos que solicitó cotizar y el estado de cada solicitud."
-        />
-      </div>
+    <div className="min-h-screen py-10 md:py-16">
+      <div className="mx-auto max-w-6xl px-4 md:px-6">
+        <Reveal>
+          <Link
+            href="/"
+            className="group mb-8 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-steel-dark transition-colors hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+            Volver al inicio
+          </Link>
+        </Reveal>
 
-      <ClientePerfilContent />
+        <Reveal className="mb-10">
+          <SectionHeader
+            as="h1"
+            eyebrow="Cuenta"
+            title={
+              <>
+                Mi <span className="text-orange">perfil</span>
+              </>
+            }
+            description="Gestione los datos de su cuenta de cliente y acceda al centro de seguimiento de solicitudes."
+          />
+        </Reveal>
+
+        <ClientePerfilContent />
+      </div>
     </div>
   );
 }

@@ -1,5 +1,10 @@
 import SystemHealthPanel from "@/components/admin/SystemHealthPanel";
+import UptimeRobotPanel from "@/components/admin/UptimeRobotPanel";
+import FcmDevicesPanel from "@/components/admin/FcmDevicesPanel";
+import AppInstallationsPanel from "@/components/admin/AppInstallationsPanel";
+import { getElectronDevices } from "@/lib/electron-presence";
 import { getSystemHealthReport } from "@/lib/system-health";
+import { getUptimeRobotOverview } from "@/lib/uptimerobot";
 
 export const dynamic = "force-dynamic";
 
@@ -8,29 +13,37 @@ export const metadata = {
 };
 
 export default async function AdminConexionesPage() {
-  const report = await getSystemHealthReport();
+  const [report, uptimeRobot, appDevices] = await Promise.all([
+    getSystemHealthReport({ includeDeviceDetails: true }),
+    getUptimeRobotOverview(),
+    getElectronDevices(),
+  ]);
 
   return (
-    <div className="w-full px-4 py-8 sm:px-6 lg:px-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-steel-dark">
-            Infraestructura y Servicios
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-bold tracking-wide text-steel-light">
-            Estado del Sistema
-          </h1>
-        </div>
+    <div className="w-full px-4 py-6 sm:px-6 lg:px-8 xl:px-10 space-y-8">
+      <div className="border-b border-white/[0.06] pb-6">
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-steel-dark">
+          Infraestructura y Servicios
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          Estado del <span className="text-orange">Sistema</span>
+        </h1>
+        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-steel-mid">
+          Monitor de conectividad en tiempo real: Firebase, Vercel, UptimeRobot,
+          aplicación administrativa de escritorio (Tauri) y endpoints de
+          integración.
+        </p>
       </div>
 
-      <p className="mt-3 max-w-2xl text-sm text-steel-mid">
-        Comprueba Firebase, Vercel, la App administrativa (Tauri) y las
-        integraciones del sistema.
-      </p>
-
-      <div className="mt-8">
+      <div>
         <SystemHealthPanel report={report} />
       </div>
+
+      <AppInstallationsPanel devices={appDevices} />
+
+      <UptimeRobotPanel overview={uptimeRobot} />
+
+      <FcmDevicesPanel />
     </div>
   );
 }

@@ -5,9 +5,11 @@ import {
 } from "@/lib/electron-presence";
 import { electronJson, electronOptionsResponse } from "@/lib/electron-cors";
 import { getFirebaseAdminFirestore } from "@/lib/firebase-admin";
-import { PRODUCTOS_COLLECTION } from "@/lib/catalog/constants";
+import {
+  PRODUCTOS_COLLECTION,
+  PRODUCTOS_PRECIOS_COLLECTION,
+} from "@/lib/catalog/constants";
 import { FieldValue } from "firebase-admin/firestore";
-import { revalidateProductPages } from "@/lib/revalidate-products";
 
 /**
  * PATCH /api/electron/productos/[id]/precio
@@ -64,10 +66,16 @@ export async function PATCH(
   }
 
   const price = body.price ?? body.listPrice;
+  const priceUsd = body.priceUsd ?? body.listPriceUsd;
 
-  if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
+  const hasPrice =
+    typeof price === "number" && Number.isFinite(price) && price >= 0;
+  const hasPriceUsd =
+    typeof priceUsd === "number" && Number.isFinite(priceUsd) && priceUsd >= 0;
+
+  if (!hasPrice && !hasPriceUsd) {
     return electronJson(
-      { error: 'Campo "price" requerido en el body (número ≥ 0).' },
+      { error: 'Campos "price" o "priceUsd" requeridos en el body (número ≥ 0).' },
       { status: 400 },
     );
   }
@@ -95,18 +103,35 @@ export async function PATCH(
       );
     }
 
-    const rounded = Math.round(price);
-    await ref.update({
-      listPrice: rounded,
-      price: rounded,
-      precio: rounded,
+    const updates: Record<string, unknown> = {
       updatedAt: FieldValue.serverTimestamp(),
-      priceUpdatedAt: FieldValue.serverTimestamp(),
+    };
+
+    if (hasPrice) {
+      const rounded = Math.round(price as number);
+      updates.listPrice = rounded;
+      updates.priceUpdatedAt = FieldValue.serverTimestamp();
+    }
+
+    if (hasPriceUsd) {
+      const roundedUsd = Math.round((priceUsd as number) * 100) / 100;
+      updates.priceUsd = roundedUsd;
+      updates.priceUsdUpdatedAt = FieldValue.serverTimestamp();
+    }
+
+    await db
+      .collection(PRODUCTOS_PRECIOS_COLLECTION)
+      .doc(id)
+      .set(updates, { merge: true });
+
+    return electronJson({
+      ok: true,
+      id,
+      ...(hasPrice ? { price: Math.round(price as number) } : {}),
+      ...(hasPriceUsd
+        ? { priceUsd: Math.round((priceUsd as number) * 100) / 100 }
+        : {}),
     });
-
-    revalidateProductPages(id);
-
-    return electronJson({ ok: true, id, price: rounded });
   } catch (error) {
     console.error(`[electron/productos/${id}/precio]`, error);
 

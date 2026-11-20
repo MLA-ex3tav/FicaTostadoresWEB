@@ -22,11 +22,15 @@ import {
   Layers,
   List,
   ListChecks,
+  Loader2,
   Lock,
+  Plus,
   Save,
   Send,
   Sliders,
   Sparkles,
+  Trash2,
+  WandSparkles,
   Wrench,
 } from "lucide-react";
 import ProductImagesField from "@/components/admin/ProductImagesField";
@@ -43,7 +47,7 @@ import {
   parseCapacity,
   type CapacityUnit,
 } from "@/lib/capacity";
-import type { Product, ProductAddOn } from "@/lib/products";
+import type { Product, ProductAddOn, ProductVariant } from "@/lib/products";
 import { hasProductImageContent } from "@/lib/product-images";
 import { slugifyProductId } from "@/lib/product-utils";
 import { useFirebaseAuth } from "@/lib/firebase-auth";
@@ -54,10 +58,40 @@ interface ProductFormProps {
   onSaved?: () => void;
   onCancel?: () => void;
   cancelLabel?: string;
+  /** Ruta interna a la que volver tras guardar (por defecto, el listado admin). */
+  redirectTo?: string;
 }
 
 function emptyAddOn(): ProductAddOn {
   return { id: "", name: "", description: "" };
+}
+
+function emptyVariant(): ProductVariant {
+  const id =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `v-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  return { id, name: "", description: "", price: undefined, priceUsd: undefined };
+}
+
+function cleanVariaciones(values: ProductVariant[]): ProductVariant[] {
+  return values
+    .map((variant) => ({
+      id: variant.id.trim() || slugifyProductId(variant.name),
+      name: variant.name.trim(),
+      ...(variant.description?.trim() ? { description: variant.description.trim() } : {}),
+      ...(typeof variant.price === "number" &&
+      Number.isFinite(variant.price) &&
+      variant.price > 0
+        ? { price: Math.round(variant.price) }
+        : {}),
+      ...(typeof variant.priceUsd === "number" &&
+      Number.isFinite(variant.priceUsd) &&
+      variant.priceUsd > 0
+        ? { priceUsd: Math.round(variant.priceUsd * 100) / 100 }
+        : {}),
+    }))
+    .filter((variant) => variant.name);
 }
 
 function createEmptyProduct(): Product {
@@ -73,13 +107,12 @@ function createEmptyProduct(): Product {
     features: [""],
     technicalDetails: [{ label: "", value: "" }],
     addOns: [],
+    applications: [],
+    variaciones: [],
     images: [],
     isOutOfStock: false,
     disableColors: false,
     disabledColors: [],
-    isPromo: false,
-    promoTag: "",
-    promoDescription: "",
     isFeatured: false,
   };
 }
@@ -106,18 +139,20 @@ const SECTION_IDS = [
   "especificaciones",
   "ficha",
   "agregados",
+  "variaciones",
 ] as const;
 
 type SectionId = (typeof SECTION_IDS)[number];
 
 const SECTIONS: { id: SectionId; label: string; icon: typeof FileText }[] = [
   { id: "basico", label: "Básico", icon: FileText },
-  { id: "opciones", label: "Estado y Promos", icon: Sliders },
+  { id: "opciones", label: "Estado y Colores", icon: Sliders },
   { id: "imagenes", label: "Imágenes", icon: ImageIcon },
   { id: "descripcion", label: "Descripción", icon: AlignLeft },
   { id: "especificaciones", label: "Especificaciones", icon: ListChecks },
   { id: "ficha", label: "Ficha técnica", icon: ClipboardList },
   { id: "agregados", label: "Agregados", icon: Wrench },
+  { id: "variaciones", label: "Variaciones", icon: Layers },
 ];
 
 function prefersReducedMotion(): boolean {
@@ -208,6 +243,7 @@ export default function ProductForm({
   onSaved,
   onCancel,
   cancelLabel = "Cancelar",
+  redirectTo,
 }: ProductFormProps) {
   const router = useRouter();
   const { adminFetch } = useFirebaseAuth();
@@ -241,6 +277,10 @@ export default function ProductForm({
   const [justSaved, setJustSaved] = useState(false);
   const [submitIntent, setSubmitIntent] = useState<"save" | "save-new">("save");
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [aiDescriptionMode, setAiDescriptionMode] = useState<
+    "generate" | "improve" | null
+  >(null);
+  const [descriptionAiError, setDescriptionAiError] = useState("");
   const savedNoticeTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -286,14 +326,18 @@ export default function ProductForm({
       return;
     }
 
-    setProduct({
-      ...initialProduct,
-      images: initialProduct.images ?? [],
+    const raf = requestAnimationFrame(() => {
+      setProduct({
+        ...initialProduct,
+        images: initialProduct.images ?? [],
+      });
+      const parsedCapacity = parseCapacity(initialProduct.capacity);
+      setCapacityValue(parsedCapacity.value);
+      setCapacityUnit(parsedCapacity.unit);
+      setIdTouched(Boolean(initialProduct.id));
     });
-    const parsedCapacity = parseCapacity(initialProduct.capacity);
-    setCapacityValue(parsedCapacity.value);
-    setCapacityUnit(parsedCapacity.unit);
-    setIdTouched(Boolean(initialProduct.id));
+
+    return () => cancelAnimationFrame(raf);
   }, [initialProduct]);
 
   useEffect(() => {
@@ -367,6 +411,93 @@ export default function ProductForm({
     setProduct((current) => ({ ...current, [key]: value }));
   }
 
+  async function handleAiDescription(mode: "generate" | "improve") {
+    if (aiDescriptionMode) {
+      return;
+    }
+
+    const name = product.name.trim();
+
+    if (!name) {
+      setDescriptionAiError(
+        "Escribe el nombre del producto antes de usar la IA.",
+      );
+      return;
+    }
+
+    if (
+      mode === "improve" &&
+      !product.description.trim() &&
+      !product.longDescription.trim()
+    ) {
+      setDescriptionAiError(
+        "Escribe una descripción corta o larga para poder mejorarla con IA.",
+      );
+      return;
+    }
+
+    setDescriptionAiError("");
+    setAiDescriptionMode(mode);
+
+    try {
+      const response = await adminFetch(
+        "/api/admin/products/ai-description",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            mode,
+            name,
+            capacity: capacityPreview,
+            catalog: product.catalog,
+            category: product.category,
+            description: product.description,
+            longDescription: product.longDescription,
+            specs: cleanLines(product.specs),
+            features: cleanLines(product.features),
+            applications: cleanLines(product.applications ?? []),
+            technicalDetails: product.technicalDetails
+              .map((detail) => ({
+                label: detail.label.trim(),
+                value: detail.value.trim(),
+              }))
+              .filter((detail) => detail.label && detail.value),
+          }),
+        },
+      );
+
+      const data = (await response.json().catch(() => null)) as {
+        description?: string;
+        longDescription?: string;
+        error?: string;
+      } | null;
+
+      const description = data?.description;
+      const longDescription = data?.longDescription;
+
+      if (!response.ok || !description || !longDescription) {
+        setDescriptionAiError(
+          data?.error ??
+            "No se pudieron procesar las descripciones. Intenta nuevamente.",
+        );
+        return;
+      }
+
+      setProduct((current) => ({
+        ...current,
+        description,
+        longDescription,
+      }));
+    } catch (generateError) {
+      setDescriptionAiError(
+        generateError instanceof Error
+          ? generateError.message
+          : "No se pudieron procesar las descripciones. Intenta nuevamente.",
+      );
+    } finally {
+      setAiDescriptionMode(null);
+    }
+  }
+
   function handleCatalogChange(catalogId: string) {
     const nextCategories = catalogConfig.categories.filter(
       (category) => category.catalogId === catalogId,
@@ -437,14 +568,16 @@ export default function ProductForm({
       images: product.images?.filter(hasProductImageContent) ?? [],
       specs: cleanLines(product.specs),
       features: cleanLines(product.features),
+      applications: cleanLines(product.applications ?? []),
       technicalDetails: product.technicalDetails
         .map((detail) => ({
           label: detail.label.trim(),
           value: detail.value.trim(),
         }))
         .filter((detail) => detail.label && detail.value),
-      addOns: cleanAddOns(product.addOns),
-    };
+addOns: cleanAddOns(product.addOns),
+    variaciones: cleanVariaciones(product.variaciones ?? []),
+  };
 
     const url =
       mode === "create"
@@ -498,11 +631,10 @@ export default function ProductForm({
 
       if (onSaved) {
         onSaved();
+        router.refresh();
       } else {
-        router.push("/admin/productos");
+        window.location.assign(redirectTo ?? "/admin/productos");
       }
-
-      router.refresh();
     } catch {
       setError("Error de conexión al guardar.");
     } finally {
@@ -541,8 +673,8 @@ export default function ProductForm({
         aria-label="Secciones del formulario"
         className="sticky top-0 z-10 -mx-4 border-b border-white/[0.06] bg-background/95 px-4 py-3 backdrop-blur-md md:-mx-6 md:px-6"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-1.5 overflow-x-auto py-0.5">
+        <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {SECTIONS.map((section) => {
               const Icon = section.icon;
               const isActive = activeSection === section.id;
@@ -559,10 +691,10 @@ export default function ProductForm({
                     }
                   }}
                   aria-current={isActive ? "true" : undefined}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                  className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-bold uppercase tracking-wider transition-colors ${
                     isActive
-                      ? "bg-orange text-white shadow-md shadow-orange/20"
-                      : "text-steel-mid border border-white/[0.06] bg-panel/40 hover:bg-panel hover:text-orange hover:border-orange/30"
+                      ? "bg-orange text-white shadow-sm shadow-orange/20"
+                      : "text-steel-mid hover:bg-white/[0.05] hover:text-white"
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -575,19 +707,23 @@ export default function ProductForm({
           <button
             type="button"
             onClick={() => setViewMode(viewMode === "tabs" ? "scroll" : "tabs")}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/[0.1] bg-surface/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-steel-mid transition-all hover:border-orange hover:text-orange"
-            title={viewMode === "tabs" ? "Cambiar a vista continua" : "Cambiar a vista por pestañas"}
+            aria-label={
+              viewMode === "tabs"
+                ? "Ver todas las secciones"
+                : "Ver por pestañas"
+            }
+            title={
+              viewMode === "tabs"
+                ? "Ver todas las secciones"
+                : "Ver por pestañas"
+            }
+            aria-pressed={viewMode === "scroll"}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-surface/80 text-steel-mid transition-colors hover:border-orange/50 hover:text-orange"
           >
             {viewMode === "tabs" ? (
-              <>
-                <List className="h-3.5 w-3.5" />
-                Ver Todo
-              </>
+              <List className="h-4 w-4" aria-hidden />
             ) : (
-              <>
-                <Layers className="h-3.5 w-3.5 text-orange" />
-                Por Pestañas
-              </>
+              <Layers className="h-4 w-4 text-orange" aria-hidden />
             )}
           </button>
         </div>
@@ -709,6 +845,25 @@ export default function ProductForm({
                     </p>
                   )}
                 </div>
+
+                <div className="md:col-span-2">
+                  <label htmlFor="applications" className={labelClass}>
+                    Aplicaciones
+                  </label>
+                  <input
+                    id="applications"
+                    value={(product.applications ?? []).join(", ")}
+                    onChange={(event) =>
+                      updateField("applications", event.target.value.split(","))
+                    }
+                    placeholder="Ej. Café, Avellanas, Trigo, Maní"
+                    className={inputClass}
+                  />
+                  <p className="mt-1.5 text-xs text-steel-dark">
+                    Sepáralas con comas. El buscador del catálogo las usa para
+                    encontrar equipos por uso, aunque el nombre no lo indique.
+                  </p>
+                </div>
               </div>
 
               {viewMode === "tabs" && (
@@ -721,8 +876,8 @@ export default function ProductForm({
             <SectionCard
               id="opciones"
               icon={Sliders}
-              title="Disponibilidad, Colores y Promociones"
-              helper="Modo agotado, deshabilitar o bloquear colores y etiquetas de oferta"
+              title="Disponibilidad y Colores"
+              helper="Modo agotado y deshabilitar o bloquear colores"
             >
               <div className="space-y-6">
                 {/* 1. MODO AGOTADO */}
@@ -871,86 +1026,7 @@ export default function ProductForm({
                   ) : null}
                 </div>
 
-                {/* 3. PROMOCIONES */}
-                <div
-                  className={`rounded-xl border p-4 space-y-4 transition-colors ${
-                    product.isPromo
-                      ? "border-amber-400/40 bg-amber-400/5"
-                      : "border-white/[0.08] bg-background/40"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${
-                          product.isPromo
-                            ? "bg-amber-400/20 text-amber-400"
-                            : "bg-amber-400/10 text-amber-400/70"
-                        }`}
-                      >
-                        <Sparkles className="h-5 w-5" aria-hidden />
-                      </span>
-                      <div>
-                        <p className="font-display text-sm font-semibold uppercase tracking-wide text-steel-light">
-                          Producto en Promoción / Oferta
-                        </p>
-                        <p className="mt-0.5 text-xs text-steel-dark">
-                          {product.isPromo
-                            ? "El equipo se destaca con distintivos de promo en el catálogo y ficha."
-                            : "Destaca el equipo con distintivos especiales de promo."}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={Boolean(product.isPromo)}
-                      id="isPromo"
-                      onClick={() => updateField("isPromo", !product.isPromo)}
-                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
-                        product.isPromo ? "bg-amber-500" : "bg-steel-dark/40"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                          product.isPromo ? "translate-x-6" : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  {product.isPromo ? (
-                    <div className="grid gap-4 sm:grid-cols-2 border-t border-white/[0.06] pt-4">
-                      <div>
-                        <label htmlFor="promoTag" className={labelClass}>
-                          Etiqueta de Promo (Texto corto)
-                        </label>
-                        <input
-                          id="promoTag"
-                          value={product.promoTag ?? ""}
-                          onChange={(e) => updateField("promoTag", e.target.value)}
-                          placeholder="Ej. OFERTA, 15% OFF, NUEVO, MÁS VENDIDO"
-                          className={inputClass}
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="promoDescription" className={labelClass}>
-                          Detalle explicativo (Opcional)
-                        </label>
-                        <input
-                          id="promoDescription"
-                          value={product.promoDescription ?? ""}
-                          onChange={(e) => updateField("promoDescription", e.target.value)}
-                          placeholder="Ej. Válido hasta fin de mes con despacho gratis"
-                          className={inputClass}
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* 4. EQUIPO DESTACADO EN INICIO */}
+                {/* 3. EQUIPO DESTACADO EN INICIO */}
                 <div
                   className={`rounded-xl border p-4 transition-colors ${
                     product.isFeatured
@@ -1026,6 +1102,42 @@ export default function ProductForm({
               helper="Texto corto (tarjetas) y descripción completa (ficha)"
             >
               <div className="space-y-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleAiDescription("generate")}
+                    disabled={aiDescriptionMode !== null}
+                    className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-orange px-3.5 text-xs font-semibold uppercase tracking-wider text-white transition-colors hover:bg-orange-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {aiDescriptionMode === "generate" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                    )}
+                    {aiDescriptionMode === "generate" ? "Generando..." : "Generar"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleAiDescription("improve")}
+                    disabled={aiDescriptionMode !== null}
+                    className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-orange/40 bg-orange/10 px-3.5 text-xs font-semibold uppercase tracking-wider text-orange transition-colors hover:bg-orange/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {aiDescriptionMode === "improve" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <WandSparkles className="h-3.5 w-3.5" aria-hidden />
+                    )}
+                    {aiDescriptionMode === "improve" ? "Mejorando..." : "Mejorar"}
+                  </button>
+                </div>
+
+                {descriptionAiError ? (
+                  <p className="text-xs text-red-400" role="alert">
+                    {descriptionAiError}
+                  </p>
+                ) : null}
+
                 <div>
                   <label htmlFor="description" className={labelClass}>
                     Descripción corta
@@ -1049,7 +1161,6 @@ export default function ProductForm({
                   </label>
                   <textarea
                     id="longDescription"
-                    required
                     rows={5}
                     value={product.longDescription}
                     onChange={(event) =>
@@ -1305,16 +1416,193 @@ export default function ProductForm({
               )}
             </SectionCard>
           )}
+
+          {(viewMode === "scroll" || activeSection === "variaciones") && (
+            <SectionCard
+              id="variaciones"
+              icon={Layers}
+              title="Variaciones del Producto"
+              helper="Versiones del mismo equipo (misma serie) con precio específico, ej. Con/Sin software, Gas LP/Natural, Monofásico/Trifásico"
+            >
+              <div className="space-y-4">
+                {(!product.variaciones || product.variaciones.length === 0) ? (
+                  <div className="rounded-2xl border border-dashed border-white/[0.08] bg-white/[0.01] px-5 py-8 text-center">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.04] text-steel-dark">
+                      <Layers className="h-5 w-5" />
+                    </div>
+                    <p className="mt-3 text-sm font-medium text-white">Sin variaciones</p>
+                    <p className="mx-auto mt-1 max-w-sm text-xs text-steel-mid leading-relaxed">
+                      Agregue opciones con precios diferenciados, por ejemplo “Con software” / “Sin software”, “Gas LP” / “Gas Natural”, etc.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {product.variaciones.map((variant, index) => (
+                      <div
+                        key={variant.id || index}
+                        className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5 shadow-sm space-y-4 transition-colors hover:border-white/[0.12]"
+                      >
+                        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-orange flex items-center gap-1.5">
+                            <Layers className="h-3.5 w-3.5" />
+                            Variación {index + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateField(
+                                "variaciones",
+                                (product.variaciones ?? []).filter((_, itemIndex) => itemIndex !== index),
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-2.5 py-1 text-xs text-red-400 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
+                            title="Quitar variación"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Quitar</span>
+                          </button>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark block mb-1.5">
+                              Nombre de la versión *
+                            </label>
+                            <input
+                              value={variant.name}
+                              placeholder="Ej. Con software, Gas LP, Trifásico 380V..."
+                              onChange={(event) => {
+                                const next = [...(product.variaciones ?? [])];
+                                next[index] = { ...next[index], name: event.target.value };
+                                updateField("variaciones", next);
+                              }}
+                              className={inputClass}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark block mb-1.5">
+                              Precio CLP (opcional)
+                            </label>
+                            <div className="relative">
+                              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 font-mono text-xs font-semibold text-steel-dark">
+                                $
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={
+                                  typeof variant.price === "number" && variant.price > 0
+                                    ? variant.price.toLocaleString("es-CL")
+                                    : ""
+                                }
+                                placeholder="0 (hereda precio del producto)"
+                                onChange={(event) => {
+                                  const digits = event.target.value.replace(/[^0-9]/g, "");
+                                  const next = [...(product.variaciones ?? [])];
+                                  next[index] = {
+                                    ...next[index],
+                                    price: digits ? parseInt(digits, 10) : undefined,
+                                  };
+                                  updateField("variaciones", next);
+                                }}
+                                className={`${inputClass} pl-8 font-mono`}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark block mb-1.5">
+                              Precio USD (opcional)
+                            </label>
+                            <div className="relative">
+                              <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 font-mono text-xs font-semibold text-steel-dark">
+                                US$
+                              </span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={
+                                  typeof variant.priceUsd === "number" && variant.priceUsd > 0
+                                    ? variant.priceUsd.toFixed(2)
+                                    : ""
+                                }
+                                placeholder="0.00 (hereda precio USD del producto)"
+                                onChange={(event) => {
+                                  const cleaned = event.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+                                  const parsed = Number(cleaned);
+                                  const next = [...(product.variaciones ?? [])];
+                                  next[index] = {
+                                    ...next[index],
+                                    priceUsd:
+                                      Number.isFinite(parsed) && parsed > 0
+                                        ? Math.round(parsed * 100) / 100
+                                        : undefined,
+                                  };
+                                  updateField("variaciones", next);
+                                }}
+                                className={`${inputClass} pl-12 font-mono`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[11px] font-medium uppercase tracking-[0.2em] text-steel-dark block mb-1.5">
+                            Descripción detallada (opcional)
+                          </label>
+                          <textarea
+                            value={variant.description ?? ""}
+                            placeholder="Qué incluye esta versión o qué componentes la diferencian."
+                            rows={2}
+                            onChange={(event) => {
+                              const next = [...(product.variaciones ?? [])];
+                              next[index] = {
+                                ...next[index],
+                                description: event.target.value,
+                              };
+                              updateField("variaciones", next);
+                            }}
+                            className={`${inputClass} resize-none`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateField("variaciones", [
+                        ...(product.variaciones ?? []),
+                        emptyVariant(),
+                      ])
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl border border-dashed border-orange/40 bg-orange/5 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-orange transition-all hover:bg-orange/10 hover:border-orange/60 active:scale-[0.98]"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Agregar variación
+                  </button>
+                </div>
+              </div>
+              {viewMode === "tabs" && (
+                <SectionFooterNav currentId="variaciones" onSelectSection={handleTabSelect} />
+              )}
+            </SectionCard>
+          )}
         </div>
 
         <aside className="hidden xl:sticky xl:top-20 xl:block">
-          <div className="rounded-xl border border-white/[0.06] bg-[var(--input-bg)] p-4">
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 shadow-xl">
             <p className="text-[11px] uppercase tracking-widest text-steel-dark">
               Ficha en vivo
             </p>
 
-            <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.06] bg-background/50">
+            <div className="mt-3 overflow-hidden rounded-xl border border-white/[0.06] bg-background/50">
               {thumbnailUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={thumbnailUrl}
                   alt=""
@@ -1345,6 +1633,32 @@ export default function ProductForm({
                     {getCategoryLabel(product.category, catalogConfig)}
                   </span>
                 </div>
+
+                {product.variaciones && product.variaciones.length > 0 ? (
+                  <div className="mt-3 border-t border-white/[0.06] pt-2.5">
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-orange flex items-center gap-1">
+                      <Layers className="h-3 w-3" />
+                      Variaciones ({product.variaciones.length})
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {product.variaciones.map((v, i) => (
+                        <span
+                          key={v.id || i}
+                          className="rounded-md border border-white/[0.08] bg-white/[0.02] px-1.5 py-0.5 text-[10px] text-steel-light"
+                        >
+                          {v.name || `Variación ${i + 1}`}
+                          {typeof v.price === "number" && v.price > 0
+                            ? ` · $${v.price.toLocaleString("es-CL")}`
+                            : ""}
+                          {typeof v.priceUsd === "number" && v.priceUsd > 0
+                            ? ` · US$ ${v.priceUsd.toFixed(2)}`
+                            : ""}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <p className="mt-2.5 text-[11px] text-steel-dark">
                   {imageCount > 0
                     ? `${imageCount} imagen${imageCount === 1 ? "" : "es"}`

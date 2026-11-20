@@ -3,13 +3,13 @@
 import Image from "next/image";
 import { Factory } from "lucide-react";
 import { useState } from "react";
-import { shouldBypassImageOptimizer } from "@/lib/blob-storage";
 
 interface MediaImageProps {
   src: string;
   alt: string;
   className?: string;
   fallbackClassName?: string;
+  fallbackSrc?: string;
   priority?: boolean;
   objectPosition?: string;
   sizes?: string;
@@ -21,19 +21,38 @@ export default function MediaImage({
   alt,
   className = "h-48 rounded-t-xl",
   fallbackClassName,
+  fallbackSrc,
   priority = false,
   objectPosition = "50% 50%",
   sizes = "(max-width: 768px) 100vw, 33vw",
   quality = 80,
 }: MediaImageProps) {
-  const [hasError, setHasError] = useState(false);
+  const [failedPrimarySrc, setFailedPrimarySrc] = useState<string | null>(null);
+  const [failedFallbackSrc, setFailedFallbackSrc] = useState<string | null>(
+    null,
+  );
   const containerClass = fallbackClassName ?? className;
-  const useDirectImage = shouldBypassImageOptimizer(src);
+
+  const canUseFallback = Boolean(fallbackSrc) && fallbackSrc !== src;
+  const primaryFailed = failedPrimarySrc === src;
+  const fallbackFailed = canUseFallback && failedFallbackSrc === fallbackSrc;
+  const currentSrc =
+    primaryFailed && canUseFallback && fallbackSrc ? fallbackSrc : src;
+  const hasError = primaryFailed && (!canUseFallback || fallbackFailed);
+
+  function handleError() {
+    if (currentSrc === src) {
+      setFailedPrimarySrc(src);
+      return;
+    }
+
+    setFailedFallbackSrc(currentSrc);
+  }
 
   if (hasError) {
     return (
       <div
-        className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#4a5059] via-[#3a3f48] to-[#525862] ${containerClass}`}
+        className={`relative flex items-center justify-center overflow-hidden bg-[#252930] ${containerClass}`}
       >
         <div
           className="absolute inset-0 opacity-20"
@@ -51,7 +70,7 @@ export default function MediaImage({
   return (
     <div className={`relative overflow-hidden ${className}`}>
       <Image
-        src={src}
+        src={currentSrc}
         alt={alt}
         fill
         className="object-cover"
@@ -60,8 +79,7 @@ export default function MediaImage({
         quality={quality}
         priority={priority}
         fetchPriority={priority ? "high" : "auto"}
-        unoptimized={useDirectImage}
-        onError={() => setHasError(true)}
+        onError={handleError}
       />
     </div>
   );

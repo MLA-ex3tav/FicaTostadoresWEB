@@ -2,18 +2,19 @@ import { notFound } from "next/navigation";
 
 import ProductForm from "@/components/admin/ProductForm";
 
-import { getProductById } from "@/lib/products-server";
+import { getAdminProductById } from "@/lib/products-server";
 
 export const dynamic = "force-dynamic";
 
 interface AdminEditProductPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string | string[] }>;
 }
 
 export async function generateMetadata({ params }: AdminEditProductPageProps) {
   const { id } = await params;
 
-  const product = await getProductById(id);
+  const product = await getAdminProductById(id);
 
   return {
     title: product
@@ -24,14 +25,21 @@ export async function generateMetadata({ params }: AdminEditProductPageProps) {
 
 export default async function AdminEditProductPage({
   params,
+  searchParams,
 }: AdminEditProductPageProps) {
   const { id } = await params;
+  const { returnTo } = await searchParams;
 
-  const product = await getProductById(id);
+  const product = await getAdminProductById(id);
 
   if (!product) {
     notFound();
   }
+
+  const redirectTo =
+    typeof returnTo === "string" && /^\/productos\/[a-z0-9-]+$/.test(returnTo)
+      ? returnTo
+      : undefined;
 
   return (
     <div className="mx-auto max-w-[90rem] px-4 py-10 md:px-8">
@@ -42,7 +50,11 @@ export default async function AdminEditProductPage({
         {product.name}
       </h2>
       <div className="mt-8">
-        <ProductForm mode="edit" initialProduct={product} />
+        <ProductForm
+          mode="edit"
+          initialProduct={product}
+          redirectTo={redirectTo}
+        />
       </div>
     </div>
   );

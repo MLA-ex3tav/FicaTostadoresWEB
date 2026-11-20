@@ -6,24 +6,20 @@ export const metadata = {
 
 export default function AdminCategoriesPage() {
   return (
-    <div className="w-full px-4 py-8 sm:px-6 lg:px-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-steel-dark">
-            Tipos de Equipos
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-bold tracking-wide text-steel-light">
-            Gestión de Categorías
-          </h1>
-        </div>
+    <div className="w-full px-4 py-6 sm:px-6 lg:px-8 xl:px-10 space-y-8">
+      <div className="border-b border-white/[0.06] pb-6">
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-steel-dark">
+          Tipos de Equipos
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          Gestión de <span className="text-orange">Categorías</span>
+        </h1>
+        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-steel-mid">
+          Cada categoría pertenece a una línea o catálogo y permite filtrar y ordenar los productos en la tienda y en la cotización.
+        </p>
       </div>
 
-      <p className="mt-3 max-w-2xl text-sm text-steel-mid">
-        Cada categoría pertenece a un catálogo (comercial, industrial,
-        procesamiento, etc.) y se usa para filtrar productos en el sitio.
-      </p>
-
-      <div className="mt-8">
+      <div>
         <CategoryAdminPanel />
       </div>
     </div>

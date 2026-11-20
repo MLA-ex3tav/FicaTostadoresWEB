@@ -1,50 +1,22 @@
 import HeroCarousel from "./HeroCarousel";
+import HeroMobileStatic from "./HeroMobileStatic";
 import HeroEntrance from "@/components/motion/HeroEntrance";
+import { DEFAULT_HERO_BANNERS } from "@/lib/hero-banners";
 import type { HeroProductBanner } from "@/lib/images";
-import { shouldBypassImageOptimizer } from "@/lib/blob-storage";
-import { getImageProps } from "next/image";
-import { preload } from "react-dom";
 
 interface HeroSectionProps {
   banners: HeroProductBanner[];
 }
 
-function preloadHeroLcpImage(banner: HeroProductBanner) {
-  const { props } = getImageProps({
-    alt: banner.name,
-    src: banner.src,
-    width: 1600,
-    height: 640,
-    sizes: "100vw",
-    quality: 80,
-    priority: true,
-  });
-
-  preload(props.src, {
-    as: "image",
-    fetchPriority: "high",
-    imageSrcSet: props.srcSet,
-    imageSizes: props.sizes,
-  });
-}
-
 export default function HeroSection({ banners }: HeroSectionProps) {
-  const firstBanner = banners[0];
-
-  if (firstBanner?.src) {
-    if (shouldBypassImageOptimizer(firstBanner.src)) {
-      preload(firstBanner.src, {
-        as: "image",
-        fetchPriority: "high",
-      });
-    } else {
-      preloadHeroLcpImage(firstBanner);
-    }
-  }
+  const mobileBanner = banners[0] ?? DEFAULT_HERO_BANNERS[0];
 
   return (
     <HeroEntrance>
-      <HeroCarousel banners={banners} />
+      <HeroMobileStatic banner={mobileBanner} />
+      <div className="hidden md:block">
+        <HeroCarousel key={banners.length} banners={banners} />
+      </div>
     </HeroEntrance>
   );
 }

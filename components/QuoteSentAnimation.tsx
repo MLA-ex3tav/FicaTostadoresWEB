@@ -79,7 +79,7 @@ export default function QuoteSentAnimation({
 
       <div className="space-y-2">
         <p
-          className={`quote-sent-animation__status text-sm font-semibold uppercase tracking-[0.2em] ${
+          className={`quote-sent-animation__status text-sm font-semibold   ${
             arrived
               ? "quote-sent-animation__status--arrived"
               : "quote-sent-animation__status--sending"
@@ -89,7 +89,7 @@ export default function QuoteSentAnimation({
           {arrived ? "Solicitud recibida" : sendingStatus}
         </p>
         {arrived ? (
-          <p className="text-xs uppercase tracking-widest text-steel-dark">
+          <p className="text-xs   text-steel-dark">
             {arrivedSubtitle}
           </p>
         ) : null}
@@ -97,11 +97,17 @@ export default function QuoteSentAnimation({
 
       {showDetails ? (
         <div className="quote-sent-animation__details space-y-4">
-          <p className="font-display text-2xl tracking-wide text-steel-light">
+          <p className="font-display text-2xl  text-steel-light">
             {title}
           </p>
           <p className="text-base leading-relaxed text-steel-mid">
             {description}
+          </p>
+          <p className="mx-auto max-w-md rounded-xl border border-white/[0.08] bg-surface/40 px-4 py-3 text-sm leading-relaxed text-steel-mid">
+            Si tu solicitud es aprobada, recibirás un correo con el detalle de la
+            propuesta. Revisa también tu bandeja de{" "}
+            <span className="font-semibold text-steel-light">spam</span> o{" "}
+            <span className="font-semibold text-steel-light">correo no deseado</span>.
           </p>
           {requestId ? (
             <p className="text-sm text-steel-dark">
@@ -115,7 +121,7 @@ export default function QuoteSentAnimation({
               <button
                 type="button"
                 onClick={() => openWhatsAppContact(whatsAppUrl)}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-emerald-500/50 bg-emerald-500/10 px-6 text-sm font-semibold uppercase tracking-wider text-emerald-400 transition-all hover:bg-emerald-500/20"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-emerald-500/50 bg-emerald-500/10 px-6 text-sm font-semibold   text-emerald-400 transition-all hover:bg-emerald-500/20"
               >
                 <MessageSquare className="h-4 w-4" />
                 Continuar por WhatsApp
@@ -128,7 +134,7 @@ export default function QuoteSentAnimation({
               <button
                 type="button"
                 onClick={onSendAnother}
-                className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold uppercase tracking-wider text-steel-light transition-colors hover:border-orange/40 hover:text-orange"
+                className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold   text-steel-light transition-colors hover:border-orange/40 hover:text-orange"
               >
                 Enviar otra solicitud
               </button>

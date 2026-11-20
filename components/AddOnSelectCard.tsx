@@ -31,7 +31,7 @@ export default function AddOnSelectCard({
     >
       <span className="min-w-0 flex-1">
         <span
-          className={`block text-base font-medium tracking-wide transition-colors ${
+          className={`block text-base font-medium  transition-colors ${
             selected ? "text-orange" : "text-steel-light"
           }`}
         >

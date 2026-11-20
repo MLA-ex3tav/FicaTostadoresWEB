@@ -129,3 +129,59 @@ En local: `vercel env pull` para obtener credenciales de Blob.
 - El catálogo base está en `lib/products.ts`; las ediciones del admin se guardan en Blob/archivo local.
 - Las imágenes de productos se suben desde el panel admin; sin fotos, las cards muestran un placeholder.
 - `npm audit` puede reportar PostCSS transitivo de Next.js; el proyecto fija `postcss >= 8.5.10` vía `overrides` en `package.json`.
+
+## Notificaciones push (FCM)
+
+La web actúa como emisor de push para la app móvil de administración:
+
+- `POST /api/electron/fcm-token` (protegido con el mismo secreto que el
+  heartbeat): la app móvil registra su token de dispositivo.
+- `DELETE /api/electron/fcm-token?deviceId=…`: da de baja el token.
+- Los tokens se guardan en Firestore (`dispositivos_fcm`) vía Admin SDK.
+- Al crearse una **cotización** (`/api/cotizaciones/solicitudes`) o una
+  **solicitud de soporte** (`/api/soporte-tecnico/solicitudes`), se envía un
+  push a todos los dispositivos registrados (fire-and-forget, no bloquea la
+  respuesta). El envío requiere que el service account tenga el rol de
+  Cloud Messaging (normalmente incluido en el Admin SDK) y el proyecto FCM
+  habilitado.
+
+## App Check
+
+El SDK cliente inicializa **App Check (reCAPTCHA Enterprise)** de forma
+automática si existe `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` (ver `lib/firebase/client.ts`).
+Sin la variable no hace nada, así el sitio funciona igual hasta configurarla.
+
+Para activarlo:
+
+1. Google Cloud → Security → **reCAPTCHA Enterprise** → crear una clave de tipo
+   website con tu dominio.
+2. Agregar `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` (Preview + Production) en Vercel.
+3. Firebase Console → App Check → **reCAPTCHA Enterprise** → registrar el sitio
+   y **aplicar** en los productos que quieras (Firestore, Storage…).
+
+Nota: reCAPTCHA Enterprise tiene una cuota gratuita (~10 k evaluaciones/mes);
+por encima requiere una cuenta de facturación en Google Cloud.
+
+## Health y monitoreo (uptime + backups)
+
+- `GET /api/health`: reporte público de salud (todas las comprobaciones del
+  panel Conexiones) en JSON, `Cache-Control: no-store`. Úsalo con UptimeRobot
+  u otro monitor externo para avisar si el sitio cae.
+- Vercel Cron (`vercel.json`, plan Hobby = solo crons diarios):
+  - `/api/cron/uptime` (00:45 UTC): se autocomprueba y registra el resultado
+    en Firestore (`uptime_checks`).
+  - `/api/cron/firestore-backup` (03:20 UTC): exporta **todo Firestore** a
+    Google Cloud Storage (managed export).
+
+**Para activar el backup** (paso manual, una vez):
+
+1. Crear el bucket GCS, p. ej. `fica-tostadores-backups`.
+2. Dar permisos a la cuenta de servicio de Firebase Admin:
+   - `roles/datastore.importExportAdmin` (proyecto)
+   - `roles/storage.objectAdmin` (bucket)
+3. Fijar `FIRESTORE_BACKUP_BUCKET=fica-tostadores-backups` en Vercel.
+
+Sin la variable el cron responde `503` y no hace nada (inocuo). El export diario
+queda en `gs://<bucket>/firestore-export/AAAA-MM-DD/`.
+
+

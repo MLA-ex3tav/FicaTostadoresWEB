@@ -14,13 +14,19 @@ export interface CotizacionProductLine {
   selectedColor: string | null;
   selectedColorId: string | null;
   selectedAddOns: CotizacionProductAddOn[];
+  variacionId: string | null;
+  variacionName: string | null;
+  /** Cantidad solicitada (1 por defecto). */
+  quantity: number;
 }
 
 /** Datos que envía la web pública al crear una solicitud. */
 export interface WebSolicitudCotizacionRecord {
   source: "web";
   clientName: string;
-  clientPhone: string;
+  clienteTipo: "empresa" | "persona";
+  clientPhone: string | null;
+  clientRut: string | null;
   clientEmail: string | null;
   clientCountry: string | null;
   message: string | null;

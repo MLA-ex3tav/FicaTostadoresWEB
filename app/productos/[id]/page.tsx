@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
-import ProductDetailPageShell from "@/components/ProductDetailPageShell";
+import ProductDetailAdminEdit from "@/components/ProductDetailAdminEdit";
 import ProductDetailSections from "@/components/ProductDetailSections";
-import Reveal from "@/components/motion/Reveal";
 import { getCatalogConfig } from "@/lib/catalog-config-server";
 import { getProductById, getProducts } from "@/lib/products-server";
+import { buildMetadata } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -23,13 +23,18 @@ export async function generateMetadata({ params }: ProductPageProps) {
   const product = await getProductById(id);
 
   if (!product) {
-    return { title: "Producto no encontrado | Fica Tostadores" };
+    return buildMetadata({
+      title: "Producto no encontrado",
+      path: `/productos/${id}`,
+      noindex: true,
+    });
   }
 
-  return {
-    title: `${product.name} | Fica Tostadores`,
+  return buildMetadata({
+    title: product.name,
     description: product.description,
-  };
+    path: `/productos/${id}`,
+  });
 }
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
@@ -45,22 +50,22 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 pb-20 pt-8 md:px-8 md:pb-24 md:pt-12 lg:px-10">
-      <Reveal>
+      <div className="mb-6 flex items-center justify-between gap-3">
         <Link
           href="/productos"
-          className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-panel/40 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-steel-mid transition-colors hover:border-orange/35 hover:text-orange"
+          className="group inline-flex items-center gap-2 px-1 py-2 text-sm font-medium text-steel-mid transition-colors hover:text-orange focus-visible:underline focus-visible:underline-offset-4"
         >
-          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
+          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
           Catálogo
         </Link>
-      </Reveal>
 
-      <ProductDetailPageShell product={product}>
-        <ProductDetailSections
-          product={product}
-          catalogConfig={catalogConfig}
-        />
-      </ProductDetailPageShell>
+        <ProductDetailAdminEdit productId={product.id} />
+      </div>
+
+      <ProductDetailSections
+        product={product}
+        catalogConfig={catalogConfig}
+      />
     </div>
   );
 }

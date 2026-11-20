@@ -1,5 +1,5 @@
 import { slugifyProductId } from "@/lib/product-utils";
-import type { Product, ProductAddOn } from "@/lib/products";
+import type { Product, ProductAddOn, ProductVariant } from "@/lib/products";
 import {
   normalizeProductImages,
   type ProductImage,
@@ -48,6 +48,64 @@ function sanitizeAddOns(value: unknown): ProductAddOn[] {
   }
 
   return addOns;
+}
+
+function sanitizeVariaciones(value: unknown): ProductVariant[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  if (value.length > 20) {
+    throw new RequestValidationError("Demasiadas variaciones.");
+  }
+
+  const variaciones: ProductVariant[] = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object") {
+      throw new RequestValidationError("Variación inválida.");
+    }
+
+    const record = item as Record<string, unknown>;
+    const name = sanitizeText(record.name, 120, { required: true });
+
+    if (!name) {
+      throw new RequestValidationError("Variación sin nombre.");
+    }
+
+    const id =
+      sanitizeSlug(record.id, 80) ?? slugifyProductId(name);
+    const description = sanitizeText(record.description, 300) ?? undefined;
+    const rawPrice =
+      typeof record.price === "number" && Number.isFinite(record.price)
+        ? record.price
+        : typeof record.price === "string"
+          ? Number(record.price.replace(/[^0-9.-]/g, ""))
+          : NaN;
+    const rawPriceUsd =
+      typeof record.priceUsd === "number" && Number.isFinite(record.priceUsd)
+        ? record.priceUsd
+        : typeof record.priceUsd === "string"
+          ? Number(record.priceUsd.replace(/[^0-9.-]/g, ""))
+          : NaN;
+
+    const price =
+      Number.isFinite(rawPrice) && rawPrice > 0 ? Math.round(rawPrice) : undefined;
+    const priceUsd =
+      Number.isFinite(rawPriceUsd) && rawPriceUsd > 0
+        ? Math.round(rawPriceUsd * 100) / 100
+        : undefined;
+
+    variaciones.push({
+      id,
+      name,
+      ...(description ? { description } : {}),
+      ...(price !== undefined ? { price } : {}),
+      ...(priceUsd !== undefined ? { priceUsd } : {}),
+    });
+  }
+
+  return variaciones;
 }
 
 function sanitizeProductImagesInput(value: unknown): ProductImage[] {
@@ -139,6 +197,9 @@ export function parseProductInput(body: unknown): Product {
         .filter((color): color is string => Boolean(color))
     : [];
 
+  const applications =
+    sanitizeStringArray(record.applications, 20, 60) ?? [];
+
   return {
     id,
     catalog,
@@ -149,15 +210,14 @@ export function parseProductInput(body: unknown): Product {
     longDescription,
     specs,
     features,
+    applications,
     technicalDetails: sanitizeTechnicalDetails(record.technicalDetails),
     addOns: sanitizeAddOns(record.addOns),
+    variaciones: sanitizeVariaciones(record.variaciones),
     images: sanitizeProductImagesInput(record.images),
     isOutOfStock: Boolean(record.isOutOfStock),
     disableColors: Boolean(record.disableColors),
     disabledColors,
-    isPromo: Boolean(record.isPromo),
-    promoTag: sanitizeText(record.promoTag, 100) ?? undefined,
-    promoDescription: sanitizeText(record.promoDescription, 300) ?? undefined,
     isFeatured: Boolean(record.isFeatured),
   };
 }

@@ -1,14 +1,11 @@
 "use client";
 
-import { ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { logoPath } from "@/lib/images";
+import { logoPath, authHeroPath } from "@/lib/images";
 
 interface AuthShellProps {
-  /** Etiqueta pequeña del panel de marca. */
-  brandEyebrow?: string;
   /** Título display del panel de marca. */
   brandTitle?: ReactNode;
   brandDescription?: string;
@@ -16,74 +13,58 @@ interface AuthShellProps {
 }
 
 export default function AuthShell({
-  brandEyebrow = "Fábrica Directa · Chile",
-  brandTitle = "MAQUINARIA INDUSTRIAL",
+  brandTitle = "Maquinaria industrial",
   brandDescription = "Tostadores y molinos fabricados bajo estándares de ingeniería, con acero y precisión para su negocio cafetero.",
   children,
 }: AuthShellProps) {
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16 lg:py-20">
-      <div className="overflow-hidden rounded-3xl border border-steel-dark/20 bg-panel shadow-2xl shadow-black/40 md:grid md:grid-cols-2">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-12 lg:py-16">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-panel md:grid md:min-h-[32rem] md:grid-cols-2">
         {/* Panel de marca */}
-        <div className="relative hidden overflow-hidden border-b border-steel-dark/20 md:block md:border-b-0 md:border-r">
-          <div className="steel-texture absolute inset-0" aria-hidden />
-          <div className="heat-glow absolute inset-0" aria-hidden />
+        <div className="relative hidden overflow-hidden border-b border-white/[0.06] bg-white/[0.01] md:block md:border-b-0 md:border-r">
+          <Image
+            src={authHeroPath}
+            alt="Tostador Fica en el campo junto a un ternero"
+            fill
+            priority
+            sizes="(min-width: 768px) 50vw, 100vw"
+            className="z-0 object-cover object-[center_62%]"
+          />
           <div
-            className="pointer-events-none absolute -right-20 top-1/3 h-72 w-72 rounded-full bg-orange/20 blur-3xl"
+            className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-[#0b0d10]/95 via-[#0b0d10]/65 to-[#0b0d10]/25"
             aria-hidden
           />
-
-          <div className="relative z-10 flex h-full flex-col justify-between p-8 lg:p-10">
-            <Link href="/" className="inline-flex w-fit" aria-label="Fica Tostadores">
-              <Image
-                src={logoPath}
-                alt="Fica Tostadores"
-                width={190}
-                height={48}
-                className="h-12 w-auto"
-              />
-            </Link>
+          <div className="relative z-10 flex min-h-full flex-col justify-between gap-10 p-8 lg:p-10">
+            <div>
+              <Link href="/" className="inline-flex min-h-11 w-fit items-center transition-opacity hover:opacity-85" aria-label="Fica Tostadores">
+                <Image
+                  src={logoPath}
+                  alt="Fica Tostadores"
+                  width={180}
+                  height={45}
+                  className="h-10 w-auto"
+                  priority
+                />
+              </Link>
+            </div>
 
             <div className="space-y-5">
-              <p className="flex items-center gap-2.5 text-sm font-medium uppercase tracking-[0.3em] text-steel-mid">
-                <span className="h-px w-7 shrink-0 bg-orange" aria-hidden />
-                {brandEyebrow}
-              </p>
-              <h2 className="font-display text-4xl font-bold leading-[1.05] tracking-wide text-steel-light xl:text-5xl">
+              <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl xl:text-4xl leading-tight">
                 {brandTitle}
               </h2>
-              <p className="max-w-md text-base leading-relaxed text-steel-mid">
+              <p className="max-w-md text-sm leading-relaxed text-steel-mid">
                 {brandDescription}
               </p>
-
-              <ul className="space-y-3 pt-1 text-sm text-steel-mid">
-                <li className="flex items-center gap-3">
-                  <ShieldCheck className="h-5 w-5 shrink-0 text-orange" aria-hidden />
-                  Garantía de 2 años en estructura y tambor
-                </li>
-                <li className="flex items-center gap-3">
-                  <ShieldCheck className="h-5 w-5 shrink-0 text-orange" aria-hidden />
-                  Repuestos 100% disponibles en Chile
-                </li>
-                <li className="flex items-center gap-3">
-                  <ShieldCheck className="h-5 w-5 shrink-0 text-orange" aria-hidden />
-                  Respaldo de ingeniería nacional
-                </li>
-              </ul>
             </div>
           </div>
         </div>
 
         {/* Panel de formulario / contenido */}
         <div className="relative">
-          <div
-            className="pointer-events-none absolute -top-16 right-0 h-40 w-40 rounded-full bg-orange/10 blur-2xl"
-            aria-hidden
-          />
           <div className="relative z-10 flex min-h-full flex-col p-6 sm:p-8 lg:p-10">
             <Link
               href="/"
-              className="mb-6 inline-flex w-fit md:hidden"
+              className="mb-6 inline-flex min-h-11 w-fit items-center md:hidden"
               aria-label="Fica Tostadores"
             >
               <Image

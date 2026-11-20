@@ -1,26 +1,22 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
+import { useState } from "react";
 import { useQuoteSelection } from "@/lib/quote-selection";
-import QuoteDesktopDock from "./QuoteDesktopDock";
-import QuoteDrawer from "./QuoteDrawer";
-import QuoteMobileSheet from "./QuoteMobileSheet";
+
+const QuoteDrawer = dynamic(() => import("./QuoteDrawer"), { ssr: false });
 
 export default function QuoteSelectionSidebar() {
-  const pathname = usePathname();
-  const { products } = useQuoteSelection();
+  const { isDrawerOpen } = useQuoteSelection();
+  const [hasOpened, setHasOpened] = useState(false);
 
-  const isCheckoutPage = pathname === "/contacto" || pathname === "/cotizar";
+  if (isDrawerOpen && !hasOpened) {
+    setHasOpened(true);
+  }
 
-  return (
-    <>
-      <QuoteDrawer />
-      {products.length > 0 && !isCheckoutPage && (
-        <>
-          <QuoteDesktopDock />
-          <QuoteMobileSheet />
-        </>
-      )}
-    </>
-  );
+  if (!hasOpened) {
+    return null;
+  }
+
+  return <QuoteDrawer />;
 }

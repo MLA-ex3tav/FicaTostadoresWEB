@@ -7,6 +7,7 @@ import {
   getBlobCommandOptions,
   isVercelBlobConfigured,
 } from "@/lib/blob-storage";
+import { isLocalDevMode } from "@/lib/local-dev/mode";
 
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "products");
 
@@ -70,7 +71,7 @@ export function normalizeImageContentType(
 }
 
 export function canUploadFiles(): boolean {
-  return canPersistWithBlob();
+  return isLocalDevMode() || canPersistWithBlob();
 }
 
 export async function saveUploadedImage(
@@ -85,7 +86,7 @@ export async function saveUploadedImage(
     "jpg";
   const filename = `${randomUUID()}.${extension}`;
 
-  if (isVercelBlobConfigured()) {
+  if (!isLocalDevMode() && isVercelBlobConfigured()) {
     const blob = await put(`product-images/${filename}`, buffer, {
       ...getBlobCommandOptions(),
       access: "public",

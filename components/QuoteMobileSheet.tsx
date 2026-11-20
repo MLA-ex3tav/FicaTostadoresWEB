@@ -110,7 +110,7 @@ export default function QuoteMobileSheet() {
       >
         <div className="overflow-hidden">
           <div
-            className={`max-h-[55vh] overflow-y-auto px-4 pb-4 transition-opacity motion-reduce:transition-none ${sheetDuration} ease-out ${
+            className={`max-h-[55dvh] overflow-y-auto px-4 pb-4 transition-opacity motion-reduce:transition-none ${sheetDuration} ease-out ${
               expanded
                 ? "opacity-100 delay-100"
                 : "pointer-events-none opacity-0 delay-0"
@@ -136,17 +136,17 @@ export default function QuoteMobileSheet() {
             }`}
           >
             <div className="min-w-0 truncate">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-orange">
+              <p className="text-xs font-medium   text-steel-mid">
                 Cotización
               </p>
-              <p className="truncate text-[11px] text-steel-dark">
+              <p className="truncate text-xs text-steel-dark">
                 {products.length}{" "}
                 {products.length === 1 ? "producto seleccionado" : "productos seleccionados"}
               </p>
             </div>
             <Link
               href="/contacto"
-              className="shrink-0 border border-white/[0.08] px-3 py-1 text-[10px] text-steel-mid transition-colors hover:border-orange/40 hover:text-orange"
+              className="inline-flex min-h-9 shrink-0 items-center rounded-lg border border-white/[0.08] px-3.5 py-2 text-xs font-semibold text-steel-mid transition-colors hover:border-orange/40 hover:text-orange"
             >
               Cotizar
             </Link>

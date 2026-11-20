@@ -1,6 +1,10 @@
+import {
+  getUptimeRobotOverview,
+  type UptimeRobotMonitorStatus,
+} from "@/lib/uptimerobot";
 import { Redis } from "@upstash/redis";
 import { isFirebaseAdminConfigured } from "@/lib/firebase-admin";
-import { getElectronPresenceStatus } from "@/lib/electron-presence";
+import { getElectronDevices, getElectronPresenceStatus } from "@/lib/electron-presence";
 import { isFirebaseConfigured } from "@/lib/firebase/client";
 import { isVercelBlobConfigured } from "@/lib/blob-storage";
 
@@ -9,6 +13,7 @@ export type HealthStatus = "ok" | "warning" | "error";
 export type HealthCategory =
   | "firebase"
   | "vercel"
+  | "monitoreo"
   | "paginas"
   | "api"
   | "integraciones";
@@ -608,14 +613,28 @@ function formatRelativeSeconds(seconds: number): string {
     return `${seconds} s`;
   }
 
-  const minutes = Math.floor(seconds / 60);
+  const days = Math.floor(seconds / 86_400);
+
+  if (days > 0) {
+    const hours = Math.floor((seconds % 86_400) / 3_600);
+    return hours > 0 ? `${days} d ${hours} h` : `${days} d`;
+  }
+
+  const totalMinutes = Math.floor(seconds / 60);
+
+  if (totalMinutes >= 60) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  }
+
   const remainder = seconds % 60;
 
   if (remainder === 0) {
-    return `${minutes} min`;
+    return `${totalMinutes} min`;
   }
 
-  return `${minutes} min ${remainder} s`;
+  return `${totalMinutes} min ${remainder} s`;
 }
 
 function formatPresenceTimestamp(iso: string): string {
@@ -625,11 +644,17 @@ function formatPresenceTimestamp(iso: string): string {
   }).format(new Date(iso));
 }
 
-async function checkElectronCotizacionesApp(): Promise<HealthCheck> {
+async function checkElectronCotizacionesApp(
+  includeDeviceDetails: boolean,
+): Promise<HealthCheck> {
   let presence: Awaited<ReturnType<typeof getElectronPresenceStatus>>;
+  let devices: Awaited<ReturnType<typeof getElectronDevices>> = [];
 
   try {
-    presence = await getElectronPresenceStatus();
+    [presence, devices] = await Promise.all([
+      getElectronPresenceStatus(),
+      getElectronDevices(),
+    ]);
   } catch (error) {
     const detail =
       error instanceof Error && error.message.trim()
@@ -646,10 +671,43 @@ async function checkElectronCotizacionesApp(): Promise<HealthCheck> {
     };
   }
 
+  const masters = devices.filter((device) => device.pcMaster);
   const details: string[] = [
+    `Equipos registrados: ${devices.length}`,
     `Umbral de desconexión: ${presence.heartbeatTimeoutSec} s sin heartbeat`,
     `Almacenamiento: ${presence.storage === "redis" ? "Upstash Redis" : "memoria local (por instancia)"}`,
   ];
+
+  if (masters.length === 0) {
+    details.push("PC Master: ningún equipo lo tiene activo.");
+  } else if (includeDeviceDetails) {
+    details.push(
+      `PC Master: ${masters
+        .map(
+          (device) =>
+            `${device.hostname ?? device.instanceId ?? "Equipo sin nombre"} (${device.connected ? "conectado" : "desconectado"})`,
+        )
+        .join(", ")}`,
+    );
+  } else {
+    details.push(`PC Master activo en ${masters.length} equipo(s).`);
+  }
+
+  if (includeDeviceDetails) {
+    for (const device of devices.slice(0, 6)) {
+      details.push(
+        `Equipo: ${device.hostname ?? device.instanceId ?? "Sin nombre"} · ${
+          device.connected
+            ? "conectado"
+            : `sin señal ${formatRelativeSeconds(device.secondsSinceLastSeen)}`
+        } · PC Master: ${device.pcMaster ? "sí" : "no"}`,
+      );
+    }
+
+    if (devices.length > 6) {
+      details.push(`… y ${devices.length - 6} equipo(s) más.`);
+    }
+  }
 
   if (!presence.secretConfigured) {
     details.unshift(
@@ -667,16 +725,31 @@ async function checkElectronCotizacionesApp(): Promise<HealthCheck> {
     };
   }
 
+  if (masters.length > 1) {
+    details.unshift(
+      "Hay más de un equipo con PC Master activo. Deja solo uno para evitar respaldos duplicados.",
+    );
+
+    return {
+      id: "electron-cotizaciones-app",
+      category: "integraciones",
+      name: "App administrativa (Tauri)",
+      status: "warning",
+      message: "Múltiples equipos tienen PC Master activo.",
+      details,
+    };
+  }
+
   if (presence.connected && presence.lastSeenAt) {
     if (presence.version) {
       details.unshift(`Versión: ${presence.version}`);
     }
 
-    if (presence.instanceId) {
+    if (includeDeviceDetails && presence.instanceId) {
       details.unshift(`Instancia: ${presence.instanceId}`);
     }
 
-    if (presence.hostname) {
+    if (includeDeviceDetails && presence.hostname) {
       details.unshift(`Equipo: ${presence.hostname}`);
     }
 
@@ -790,6 +863,83 @@ async function checkUpstashRedis(): Promise<HealthCheck> {
   }
 }
 
+const UPTIME_ROBOT_STATUS_LABELS: Record<UptimeRobotMonitorStatus, string> = {
+  up: "Activo",
+  down: "Caído",
+  paused: "Pausado",
+  unknown: "Sin datos",
+};
+
+function formatUptimeRatio(value: number | null): string {
+  return value === null
+    ? "sin datos"
+    : `${value.toFixed(2).replace(".", ",")}%`;
+}
+
+function formatResponseTime(value: number | null): string {
+  return value === null ? "sin datos" : `${Math.round(value)} ms`;
+}
+
+async function checkUptimeRobot(): Promise<HealthCheck> {
+  const overview = await getUptimeRobotOverview();
+
+  if (!overview.configured) {
+    return {
+      id: "uptimerobot",
+      category: "monitoreo",
+      name: "UptimeRobot",
+      status: "warning",
+      message:
+        "Monitoreo externo sin configurar. Agrega UPTIMEROBOT_API_KEY para ver el estado de los monitores.",
+    };
+  }
+
+  if (!overview.ok) {
+    return {
+      id: "uptimerobot",
+      category: "monitoreo",
+      name: "UptimeRobot",
+      status: "error",
+      message: "No se pudo consultar UptimeRobot.",
+      details: overview.error ? [overview.error] : undefined,
+    };
+  }
+
+  if (overview.monitors.length === 0) {
+    return {
+      id: "uptimerobot",
+      category: "monitoreo",
+      name: "UptimeRobot",
+      status: "warning",
+      message:
+        "La API respondió, pero no hay monitores creados en UptimeRobot.",
+    };
+  }
+
+  const { summary } = overview;
+  const details = overview.monitors.map(
+    (monitor) =>
+      `${monitor.name}: ${UPTIME_ROBOT_STATUS_LABELS[monitor.status]} · 7 d ${formatUptimeRatio(monitor.uptime7d)} · 30 d ${formatUptimeRatio(monitor.uptime30d)} · ${formatResponseTime(monitor.averageResponseMs)}`,
+  );
+
+  const status: HealthStatus =
+    summary.down > 0 ? "error" : summary.paused > 0 ? "warning" : "ok";
+
+  const message =
+    summary.down > 0
+      ? `${summary.down} de ${summary.total} monitores caídos.`
+      : `${summary.up} de ${summary.total} monitores activos · uptime 30 d ${formatUptimeRatio(summary.averageUptime30d)} · respuesta media ${formatResponseTime(summary.averageResponseMs)}.`;
+
+  return {
+    id: "uptimerobot",
+    category: "monitoreo",
+    name: "UptimeRobot",
+    status,
+    message,
+    details,
+  };
+}
+
 async function checkRouteReachability(
   baseUrl: string,
   path: string,
@@ -879,7 +1029,17 @@ function consolidateHttpRouteChecks(
   ];
 }
 
-export async function getSystemHealthReport(): Promise<SystemHealthReport> {
+export interface SystemHealthReportOptions {
+  /**
+   * Incluye hostnames, instanceIds y equipos con PC Master. Solo para el panel
+   * admin; el endpoint público /api/health debe usar el valor por defecto.
+   */
+  includeDeviceDetails?: boolean;
+}
+
+export async function getSystemHealthReport(
+  options: SystemHealthReportOptions = {},
+): Promise<SystemHealthReport> {
   const baseUrl = getHealthCheckBaseUrl();
   const publicSiteUrl = getDeploymentBaseUrl();
 
@@ -901,8 +1061,9 @@ export async function getSystemHealthReport(): Promise<SystemHealthReport> {
     ]);
 
     const integrationChecks = await Promise.all([
-      checkElectronCotizacionesApp(),
+      checkElectronCotizacionesApp(options.includeDeviceDetails === true),
       checkUpstashRedis(),
+      checkUptimeRobot(),
     ]);
 
     const pageChecks = await Promise.all(
@@ -964,6 +1125,7 @@ export async function getSystemHealthReport(): Promise<SystemHealthReport> {
 export const HEALTH_CATEGORY_LABELS: Record<HealthCategory, string> = {
   firebase: "Firebase",
   vercel: "Vercel",
+  monitoreo: "Monitoreo externo",
   paginas: "Páginas públicas",
   api: "API pública",
   integraciones: "Otras integraciones",

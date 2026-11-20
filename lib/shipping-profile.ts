@@ -13,6 +13,8 @@ export interface ClienteShippingProfile extends ShippingInfo {
   contactName: string | null;
   phone: string | null;
   email: string | null;
+  rut: string | null;
+  clienteTipo: "empresa" | "persona" | null;
 }
 
 export const EMPTY_SHIPPING_INFO: ShippingInfo = {
@@ -72,10 +74,17 @@ export function sanitizeClienteShippingProfile(
   const record = value as Record<string, unknown>;
   const shipping = sanitizeShippingInfo(record) ?? { ...EMPTY_SHIPPING_INFO, country: "Chile" };
 
+  const clienteTipoRaw = sanitizeShippingField(record.clienteTipo, 20);
+
   return {
     contactName: sanitizeShippingField(record.contactName, 120),
     phone: sanitizeShippingField(record.phone, 32),
     email: sanitizeShippingField(record.email, 200),
+    rut: sanitizeShippingField(record.rut, 20),
+    clienteTipo:
+      clienteTipoRaw === "empresa" || clienteTipoRaw === "persona"
+        ? clienteTipoRaw
+        : null,
     ...shipping,
   };
 }

@@ -1,95 +1,54 @@
 "use client";
 
-import {
-  motion,
-  useReducedMotion,
-  type HTMLMotionProps,
-  type MotionProps,
-} from "framer-motion";
-import type { ElementType, ReactNode } from "react";
-import { motionDuration, motionEase, motionViewport } from "@/lib/motion";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
-const containerVariants = {
-  hidden: {},
-  show: {
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.05,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: motionDuration.base,
-      ease: motionEase,
-    },
-  },
-};
-
-type MotionElement = keyof typeof motion;
-
-interface StaggerProps extends Omit<HTMLMotionProps<"div">, "children"> {
+interface StaggerProps {
   children: ReactNode;
-  as?: MotionElement;
+  className?: string;
 }
 
-export function Stagger({
-  children,
-  className,
-  as = "div",
-  ...rest
-}: StaggerProps) {
-  const shouldReduceMotion = useReducedMotion();
-  const Tag = as as ElementType;
+export function Stagger({ children, className }: StaggerProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
 
-  if (shouldReduceMotion) {
-    return <Tag className={className}>{children}</Tag>;
-  }
+  useEffect(() => {
+    const node = ref.current;
 
-  const MotionTag = motion.create(Tag);
+    if (!node) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "-72px 0px -72px 0px" },
+    );
+
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <MotionTag
-      className={className}
-      variants={containerVariants}
-      initial="hidden"
-      whileInView="show"
-      viewport={motionViewport}
-      {...(rest as MotionProps)}
+    <div
+      ref={ref}
+      className={cn("stagger", visible && "is-visible", className)}
     >
       {children}
-    </MotionTag>
+    </div>
   );
 }
 
-interface StaggerItemProps extends Omit<HTMLMotionProps<"div">, "children"> {
+interface StaggerItemProps {
   children: ReactNode;
-  as?: MotionElement;
+  className?: string;
 }
 
-export function StaggerItem({
-  children,
-  className,
-  as = "div",
-  ...rest
-}: StaggerItemProps) {
-  const shouldReduceMotion = useReducedMotion();
-  const Tag = as as ElementType;
-
-  if (shouldReduceMotion) {
-    return <Tag className={className}>{children}</Tag>;
-  }
-
-  const MotionTag = motion.create(Tag);
-
-  return (
-    <MotionTag className={className} variants={itemVariants} {...(rest as MotionProps)}>
-      {children}
-    </MotionTag>
-  );
+export function StaggerItem({ children, className }: StaggerItemProps) {
+  return <div className={cn("stagger-item", className)}>{children}</div>;
 }

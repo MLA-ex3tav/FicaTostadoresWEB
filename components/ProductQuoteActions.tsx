@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ShoppingBag } from "lucide-react";
-import type { ProductAddOn } from "@/lib/products";
+import type { ProductAddOn, ProductVariant } from "@/lib/products";
 import { buildQuoteProductItem } from "@/lib/quote-product";
 import { useQuoteSelection } from "@/lib/quote-selection";
 import QuoteAddOnSelector from "./QuoteAddOnSelector";
@@ -12,7 +12,11 @@ interface ProductQuoteActionsProps {
   productId: string;
   productName: string;
   productCapacity: string;
+  productImage?: string | null;
   addOns: ProductAddOn[];
+  variaciones: ProductVariant[];
+  selectedVariantId?: string | null;
+  onVariantChange?: (variantId: string) => void;
   selectedColor?: string | null;
   selectedColorId: string;
   isOutOfStock?: boolean;
@@ -23,7 +27,11 @@ export default function ProductQuoteActions({
   productId,
   productName,
   productCapacity,
+  productImage,
   addOns,
+  variaciones,
+  selectedVariantId,
+  onVariantChange,
   selectedColor,
   selectedColorId,
   isOutOfStock = false,
@@ -40,6 +48,9 @@ export default function ProductQuoteActions({
   const selectedAddOnIds = localAddOnIds ?? quoteAddOnIds;
   const alreadySelected = hasProduct(productId);
   const hasAddOns = addOns.length > 0;
+  const hasVariaciones = variaciones.length > 0;
+  const selectedVariant =
+    variaciones.find((variant) => variant.id === selectedVariantId) ?? null;
 
   function buildSelection(selectedIds: string[]) {
     return buildQuoteProductItem(
@@ -47,10 +58,12 @@ export default function ProductQuoteActions({
         id: productId,
         name: productName,
         capacity: productCapacity,
+        image: productImage,
         addOns,
       },
       selectedIds,
       { id: selectedColorId, name: selectedColor },
+      selectedVariant ? { id: selectedVariant.id, name: selectedVariant.name } : null,
     );
   }
 
@@ -70,19 +83,69 @@ export default function ProductQuoteActions({
     }
   }
 
+  const variantSelector = hasVariaciones && !isOutOfStock ? (
+    <div className="space-y-3 border-t border-white/[0.08] pt-4">
+      <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
+        <p className="text-sm font-medium text-steel-light">
+          Versión del equipo
+        </p>
+        <span className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-xs font-medium text-steel-mid">
+          {variaciones.length} {variaciones.length === 1 ? "opción" : "opciones"}
+        </span>
+      </div>
+      <div className="space-y-2" role="radiogroup" aria-label="Versión del producto">
+        {variaciones.map((variant) => {
+          const active = variant.id === selectedVariantId;
+          return (
+            <button
+              key={variant.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onVariantChange?.(variant.id)}
+              className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-md border p-3 text-left transition-colors ${
+                active
+                  ? "border-white/20 bg-white/[0.05] text-white"
+                  : "border-white/[0.08] bg-white/[0.02] text-steel-light hover:border-white/[0.16] hover:bg-white/[0.04]"
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                      active ? "bg-orange" : "bg-white/20"
+                    }`}
+                  />
+                  <span className="text-sm sm:text-xs font-semibold text-white">
+                    {variant.name}
+                  </span>
+                </div>
+                {variant.description ? (
+                  <p className="mt-1 pl-4 text-sm sm:text-xs text-steel-mid leading-relaxed">
+                    {variant.description}
+                  </p>
+                ) : null}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
   if (compact) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3.5 pt-1">
+        {variantSelector}
         {hasAddOns && !isOutOfStock ? (
-          <div className="rounded-xl border border-white/[0.06] bg-background/40 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-steel-dark">
-              Agregados
+          <div className="space-y-3 border-t border-white/[0.08] pt-4">
+            <p className="border-b border-white/[0.06] pb-2.5 text-sm font-medium text-steel-light">
+              Agregados opcionales
             </p>
             <QuoteAddOnSelector
               addOns={addOns}
               selectedIds={selectedAddOnIds}
               onChange={handleAddOnChange}
-              className="mt-3"
             />
           </div>
         ) : null}
@@ -91,12 +154,12 @@ export default function ProductQuoteActions({
           type="button"
           disabled={isOutOfStock}
           onClick={handleAddOrUpdate}
-          className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold uppercase tracking-wider transition-all active:scale-[0.98] ${
+          className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-md px-5 text-sm font-medium transition-colors ${
             isOutOfStock
               ? "border border-red-500/30 bg-red-500/10 text-red-400 opacity-80 cursor-not-allowed"
               : alreadySelected
                 ? "border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15"
-                : "bg-orange text-white shadow-lg shadow-orange/15 hover:bg-orange-hover"
+                : "bg-orange text-white hover:bg-orange-hover"
           }`}
         >
           {isOutOfStock ? (
@@ -119,7 +182,7 @@ export default function ProductQuoteActions({
 
         <Link
           href="/productos"
-          className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-white/[0.08] bg-background/30 text-xs font-semibold uppercase tracking-wider text-steel-mid transition-colors hover:border-orange/40 hover:text-orange"
+          className="inline-flex w-full items-center justify-center px-2 py-2 text-center text-sm font-medium text-steel-mid transition-colors hover:text-orange focus-visible:underline focus-visible:underline-offset-4"
         >
           Ver más productos
         </Link>
@@ -129,14 +192,15 @@ export default function ProductQuoteActions({
 
   return (
     <div className="mt-12 space-y-6">
+      {variantSelector}
       {hasAddOns && !isOutOfStock ? (
         <div className="rounded-2xl border border-white/[0.08] bg-panel/60 p-5 shadow-lg shadow-black/20">
-          <p className="font-display text-lg uppercase tracking-wide text-steel-light">
-            Agregados Opcionales
+            <p className="text-base font-medium text-white">
+            Agregados opcionales
           </p>
           <p className="mt-1 text-xs text-steel-mid">
             Seleccione los accesorios que desea incluir en su cotización para{" "}
-            <span className="font-semibold text-orange">{productName}</span>:
+            <span className="font-medium text-white">{productName}</span>:
           </p>
 
           <QuoteAddOnSelector
@@ -153,7 +217,7 @@ export default function ProductQuoteActions({
           type="button"
           disabled={isOutOfStock}
           onClick={handleAddOrUpdate}
-          className={`inline-flex h-14 min-w-[16rem] items-center justify-center gap-2.5 rounded-xl px-8 text-sm font-semibold uppercase tracking-wider shadow-lg transition-all active:scale-[0.98] ${
+          className={`inline-flex h-12 w-full min-w-0 items-center justify-center gap-2.5 rounded-md px-6 text-sm font-medium transition-colors sm:w-auto sm:min-w-[16rem] ${
             isOutOfStock
               ? "border border-red-500/40 bg-red-500/10 text-red-400 opacity-80 cursor-not-allowed"
               : alreadySelected
@@ -181,7 +245,7 @@ export default function ProductQuoteActions({
 
         <Link
           href="/productos"
-          className="inline-flex h-14 items-center justify-center rounded-xl border border-steel-mid/40 bg-panel/40 px-8 text-sm font-semibold uppercase tracking-wider text-steel-light transition-colors hover:border-orange hover:text-orange"
+          className="inline-flex w-full items-center justify-center px-2 py-3 text-center text-sm font-medium text-steel-mid transition-colors hover:text-orange focus-visible:underline focus-visible:underline-offset-4"
         >
           Ver más productos
         </Link>

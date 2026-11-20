@@ -23,11 +23,23 @@ export const PRODUCT_COLORS: ProductColorOption[] = [
 
 export const DEFAULT_PRODUCT_COLOR_ID = "naranjo-fica";
 
+/** Color especial "Sin color" (productos metálicos / sin pintar). */
+export const SIN_COLOR_ID = "sin-color";
+export const SIN_COLOR_LABEL = "Sin color";
+
+export function isSinColor(id: string | null | undefined): boolean {
+  return id === SIN_COLOR_ID;
+}
+
 export function getProductColorById(id: string): ProductColorOption | undefined {
   return PRODUCT_COLORS.find((color) => color.id === id);
 }
 
 export function getProductColorLabel(id: string | null | undefined): string | null {
+  if (isSinColor(id)) {
+    return SIN_COLOR_LABEL;
+  }
+
   if (!id) {
     return null;
   }

@@ -3,16 +3,28 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Menu, ShoppingCart, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { logoPath } from "@/lib/images";
 import { useQuoteSelection } from "@/lib/quote-selection";
-import AuthNavButton from "@/components/AuthNavButton";
+import { useFirebaseAuth } from "@/lib/firebase-auth";
+import { useGuestName } from "@/lib/guest-name";
+import LoginNavButton from "@/components/LoginNavButton";
+
+const AuthNavButton = dynamic(() => import("@/components/AuthNavButton"), {
+  ssr: false,
+});
+
+const GuestContinueButton = dynamic(
+  () => import("@/components/GuestContinueButton"),
+  { ssr: false },
+);
 
 const navLinks = [
   { href: "/", label: "Inicio" },
   { href: "/productos", label: "Productos" },
-  { href: "/servicio-tecnico", label: "Soporte Técnico" },
+  { href: "/servicio-tecnico", label: "Soporte técnico" },
 ];
 
 function CotizarButton({
@@ -26,7 +38,6 @@ function CotizarButton({
   const count = products.length;
 
   const handleClick = (e: React.MouseEvent) => {
-    // Open drawer on click
     e.preventDefault();
     if (onClick) onClick();
     openDrawer();
@@ -37,14 +48,20 @@ function CotizarButton({
       type="button"
       onClick={handleClick}
       aria-label={`Ver cotización (${count} equipos)`}
-      className={`relative inline-flex items-center justify-center rounded-lg border border-steel-dark/30 p-2 text-steel-mid transition-colors hover:border-orange/60 hover:text-orange active:scale-[0.97] ${className}`}
+      title="Ver mi cotización"
+      className={`group relative inline-flex h-11 w-11 items-center justify-center rounded-md text-steel-mid transition-colors hover:bg-white/[0.04] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange ${className}`}
     >
-      <ShoppingCart className="h-5 w-5" />
-      {count > 0 ? (
-        <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange px-1 text-xs font-bold text-white shadow-sm">
-          {count}
-        </span>
-      ) : null}
+      <div className="relative flex items-center">
+        <ShoppingCart className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+        {count > 0 && (
+          <span
+            key={count}
+            className="absolute -right-2 -top-2 flex h-4 min-w-4 animate-in zoom-in-50 fade-in items-center justify-center rounded-sm bg-orange px-1 text-[10px] font-bold leading-none tabular-nums text-white duration-150"
+          >
+            {count}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
@@ -52,13 +69,50 @@ function CotizarButton({
 export default function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const { products } = useQuoteSelection();
+  const { user, loading: authLoading } = useFirebaseAuth();
+  const guestName = useGuestName();
+  const cartCount = products.length;
+  const showGuestOption = !authLoading && !user && !guestName;
+  const hasAccount = Boolean(user) || Boolean(guestName);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    const raf = requestAnimationFrame(onScroll);
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  // Cerrar menú móvil al cambiar de ruta
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      setMenuOpen(false);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-steel-dark/20 bg-background/85 backdrop-blur-md">
-      <nav className="mx-auto grid h-16 max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 md:px-6">
+    <header
+      className={`sticky top-0 z-50 border-b transition-colors duration-200 ${
+        scrolled
+          ? "border-white/10 bg-background/95 backdrop-blur-sm"
+          : "border-white/[0.08] bg-background"
+      }`}
+    >
+      <nav
+        aria-label="Navegación principal"
+        className="mx-auto flex h-[72px] w-full max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4 md:px-6"
+      >
+        {/* LOGO & BADGE INDUSTRIAL */}
         <Link
           href="/"
-          className="flex items-center justify-self-start"
+          className="group flex min-h-11 min-w-0 shrink items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange"
           onClick={() => setMenuOpen(false)}
         >
           <Image
@@ -66,86 +120,126 @@ export default function Navbar() {
             alt="Fica Tostadores"
             width={200}
             height={56}
-            className="h-8 w-auto md:h-9"
+            className="h-auto max-h-7 w-full max-w-[100px] object-contain transition-opacity duration-200 group-hover:opacity-80 sm:max-h-8 sm:max-w-[130px] lg:max-h-9"
             priority
           />
         </Link>
 
-        <ul className="hidden items-center justify-center gap-8 md:flex">
+        {/* Navegación plana con indicador de página activa. */}
+        <ul className="hidden items-center gap-8 lg:flex">
           {navLinks.map((link) => {
             const isActive =
               link.href === "/"
                 ? pathname === "/"
                 : pathname.startsWith(link.href);
+
             return (
-              <li key={link.href} className="flex items-center">
+              <li key={link.href} className="relative">
                 <Link
                   href={link.href}
-                  className={`relative text-base font-semibold uppercase tracking-wider transition-colors ${
+                  aria-current={isActive ? "page" : undefined}
+                  className={`relative inline-flex min-h-11 items-center border-b-2 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange ${
                     isActive
-                      ? "text-orange"
-                      : "text-steel-mid hover:text-steel-light"
+                      ? "border-orange text-orange"
+                      : "border-transparent text-steel-mid hover:border-white/20 hover:text-white"
                   }`}
                 >
                   {link.label}
+
                 </Link>
               </li>
             );
           })}
         </ul>
 
-        <div className="flex items-center justify-self-end gap-3">
-          <AuthNavButton />
+        {/* ACCIONES DERECHA */}
+        <div className="flex shrink-0 items-center gap-1 sm:gap-3 md:justify-self-end">
+          {hasAccount ? <AuthNavButton /> : <LoginNavButton />}
           <CotizarButton />
-        </div>
 
-        <button
-          type="button"
-          className="absolute right-4 text-steel-light md:hidden"
-          aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          {menuOpen ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <Menu className="h-6 w-6" />
-          )}
-        </button>
+          {/* BOTÓN MENÚ MÓVIL */}
+          <button
+            type="button"
+            className="relative flex h-11 w-11 items-center justify-center rounded-md text-steel-light transition-colors hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-orange lg:hidden"
+            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-navigation"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? (
+              <span className="flex">
+                <X className="h-5 w-5" />
+              </span>
+            ) : (
+              <span className="flex">
+                <Menu className="h-5 w-5" />
+              </span>
+            )}
+          </button>
+        </div>
       </nav>
 
+      {/* MENÚ MÓVIL */}
       {menuOpen && (
-        <div className="border-t border-steel-dark/20 bg-panel/95 backdrop-blur-md md:hidden">
-          <ul className="flex flex-col px-4 py-2">
+        <div
+          id="mobile-navigation"
+          className="absolute inset-x-0 top-full max-h-[calc(100dvh-72px)] overflow-y-auto overscroll-contain border-b border-t border-white/[0.08] bg-background pb-[env(safe-area-inset-bottom)] shadow-xl animate-in fade-in slide-in-from-top-2 duration-200 lg:hidden"
+        >
+          <div className="flex flex-col gap-2 px-4 py-5">
             {navLinks.map((link) => {
               const isActive =
                 link.href === "/"
                   ? pathname === "/"
                   : pathname.startsWith(link.href);
+
               return (
-                <li key={link.href}>
+                <div key={link.href}>
                   <Link
                     href={link.href}
-                    className={`flex items-center gap-2 py-3 text-base font-semibold uppercase tracking-wider transition-colors ${
-                      isActive
-                        ? "text-orange"
-                        : "text-steel-mid hover:text-steel-light"
-                    }`}
+                    aria-current={isActive ? "page" : undefined}
                     onClick={() => setMenuOpen(false)}
+                    className={`flex min-h-11 items-center justify-between rounded-md px-4 py-3 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "bg-white/[0.08] text-orange"
+                        : "text-steel-mid hover:bg-white/[0.04] hover:text-white"
+                    }`}
                   >
-                    {link.label}
+                    <span>{link.label}</span>
+                    {isActive && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-orange" />
+                    )}
                   </Link>
-                </li>
+                </div>
               );
             })}
-            <li className="flex items-center justify-between gap-4 py-3">
-              <span className="text-sm font-medium text-steel-mid">Mi cotización</span>
+
+            <div className="my-2 h-[1px] bg-white/[0.08]" />
+
+            <div className="mt-1 flex items-center gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white">
+                  Mi cotización
+                </p>
+                <p className="truncate text-xs text-steel-dark">
+                  {cartCount > 0
+                    ? `${cartCount} ${
+                        cartCount === 1
+                          ? "equipo seleccionado"
+                          : "equipos seleccionados"
+                      }`
+                    : "Aún no agregas equipos"}
+                </p>
+              </div>
               <CotizarButton onClick={() => setMenuOpen(false)} />
-            </li>
-            <li className="pb-3">
-              <AuthNavButton className="block w-full justify-center" onAction={() => setMenuOpen(false)} />
-            </li>
-          </ul>
+            </div>
+
+            {showGuestOption ? (
+              <GuestContinueButton
+                onDone={() => setMenuOpen(false)}
+                className="mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 text-sm font-semibold text-steel-light transition-all hover:border-orange/40 hover:bg-white/[0.06] hover:text-orange active:scale-[0.98]"
+              />
+            ) : null}
+          </div>
         </div>
       )}
     </header>

@@ -5,7 +5,7 @@ import { ChevronDown, X } from "lucide-react";
 import { useQuoteSelection } from "@/lib/quote-selection";
 
 export const quoteEyebrowClass =
-  "text-sm font-semibold uppercase tracking-[0.3em] text-orange";
+  "text-xs font-medium   text-steel-mid";
 
 export const quoteCountClass = "text-base text-steel-mid";
 
@@ -38,7 +38,7 @@ export default function QuoteProductList({
     return (
       <div className={className}>
         <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-steel-dark">
+          <p className="text-xs   text-steel-dark">
             Cotización
           </p>
           <p className="text-sm text-steel-mid">{countLabel}</p>
@@ -51,7 +51,8 @@ export default function QuoteProductList({
               className="flex items-start justify-between gap-3 py-3.5"
             >
               <div className="min-w-0 flex-1">
-                <p className="font-display text-lg tracking-wide text-steel-light">
+                <p className="text-base font-medium text-steel-light">
+                  {(product.quantity ?? 1) > 1 ? `${product.quantity}× ` : ""}
                   {product.name}
                 </p>
                 <p className="mt-0.5 text-xs text-steel-dark">{product.capacity}</p>
@@ -69,7 +70,7 @@ export default function QuoteProductList({
               <button
                 type="button"
                 onClick={() => removeProduct(product.id)}
-                className="mt-0.5 shrink-0 p-1 text-steel-dark transition-colors hover:text-orange"
+                className="mt-0.5 -mr-2.5 shrink-0 rounded-lg p-2.5 text-steel-dark transition-colors hover:text-white"
                 aria-label={`Quitar ${product.name} de la cotización`}
               >
                 <X className="h-4 w-4" strokeWidth={2} />
@@ -104,12 +105,12 @@ export default function QuoteProductList({
 
   return (
     <div className={className}>
-      <div className="shrink-0 border-b border-white/[0.08] pb-4">
+      <div className="shrink-0 border-b border-white/[0.06] pb-3.5">
         {onCollapse ? (
           <button
             type="button"
             onClick={onCollapse}
-            className="flex w-full items-start justify-between gap-3 rounded-xl px-1 py-1 text-left transition-colors hover:text-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange/40"
+            className="group flex w-full items-start justify-between gap-3 rounded-xl px-1 py-0.5 text-left transition-colors focus-visible:outline-none"
             aria-label="Contraer lista de cotización"
           >
             {headerContent}
@@ -119,24 +120,25 @@ export default function QuoteProductList({
         )}
       </div>
 
-      <ul className="mt-4 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
+      <ul className="custom-scrollbar mt-3.5 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-0.5">
         {products.map((product) => (
           <li
             key={product.id}
-            className="flex items-start justify-between gap-3 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3.5 py-3"
+            className="flex items-start justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 transition-colors hover:border-white/15"
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-xl tracking-wide text-steel-light">
+              <p className="text-sm font-semibold text-white leading-snug">
+                {(product.quantity ?? 1) > 1 ? `${product.quantity}× ` : ""}
                 {product.name}
               </p>
-              <p className="mt-1 text-base text-steel-dark">{product.capacity}</p>
+              <p className="mt-1 text-xs text-steel-dark font-medium">{product.capacity}</p>
               {product.selectedColor ? (
-                <p className="mt-1 text-sm text-steel-mid">
+                <p className="mt-1 text-xs text-steel-mid">
                   Color: {product.selectedColor}
                 </p>
               ) : null}
               {product.selectedAddOns && product.selectedAddOns.length > 0 ? (
-                <p className="mt-1.5 text-base text-orange/80">
+                <p className="mt-1 text-xs text-steel-mid">
                   + {product.selectedAddOns.map((addOn) => addOn.name).join(", ")}
                 </p>
               ) : null}
@@ -144,10 +146,10 @@ export default function QuoteProductList({
             <button
               type="button"
               onClick={() => removeProduct(product.id)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] text-steel-dark transition-colors hover:border-orange/40 hover:bg-orange/10 hover:text-orange"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-steel-dark transition-colors hover:bg-white/[0.08] hover:text-white"
               aria-label={`Quitar ${product.name} de la cotización`}
             >
-              <X className="h-5 w-5" strokeWidth={2} />
+              <X className="h-4 w-4" strokeWidth={2} />
             </button>
           </li>
         ))}
@@ -156,7 +158,7 @@ export default function QuoteProductList({
       {showCta && (
         <Link
           href="/contacto"
-          className="mt-4 block w-full shrink-0 rounded-xl border border-orange/40 py-3.5 text-center text-base font-semibold uppercase tracking-wider text-orange transition-colors hover:border-orange hover:bg-orange/10"
+          className="mt-3.5 flex h-11 w-full shrink-0 items-center justify-center rounded-xl bg-orange text-xs font-semibold   text-white transition-all hover:bg-orange-hover active:scale-[0.98] shadow-md"
         >
           Ir a cotizar
         </Link>

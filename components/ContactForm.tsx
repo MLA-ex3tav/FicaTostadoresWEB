@@ -2,20 +2,24 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Building2, User } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import "@/components/contact-phone.css";
-import flags from "react-phone-number-input/flags";
-import es from "react-phone-number-input/locale/es";
-import PhoneCountrySelect from "@/components/PhoneCountrySelect";
-import { AMERICA_COUNTRIES } from "@/lib/phone-countries";
+import DetectedPhoneCountry from "@/components/DetectedPhoneCountry";
+import PhoneCountrySelectHidden from "@/components/PhoneCountrySelectHidden";
 import QuoteSentAnimation from "@/components/QuoteSentAnimation";
+import AddressField, {
+  type AddressSelection,
+} from "@/components/AddressField";
+import CustomSelect from "@/components/CustomSelect";
 import {
   getClienteShippingProfile,
   saveClienteShippingProfile,
 } from "@/lib/auth-sync-client";
 import { useFirebaseAuth } from "@/lib/firebase-auth";
+import { saveGuestName, useGuestName } from "@/lib/guest-name";
 import { buildQuoteProductItem } from "@/lib/quote-product";
 import type { Product } from "@/lib/products";
 import {
@@ -23,8 +27,12 @@ import {
   openWhatsAppContact,
 } from "@/lib/quoting";
 import { SLUG_PATTERN, sanitizeText } from "@/lib/sanitize";
+import { formatRut, validarRut } from "@/lib/rut";
 import {
-  hasShippingInfo,
+  isValidClientName,
+  type ClienteTipo,
+} from "@/lib/validation/contact";
+import {
   sanitizeShippingInfo,
   type ClienteShippingProfile,
   type ShippingInfo,
@@ -32,7 +40,20 @@ import {
 import { useQuoteSelection } from "@/lib/quote-selection";
 
 const fieldLabelClass =
-  "mb-2.5 block text-sm font-medium uppercase tracking-widest text-steel-mid md:mb-2 md:text-xs md:font-normal";
+  "mb-2 block text-sm font-medium text-steel-mid";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const PLACE_TYPE_OPTIONS = [
+  { value: "Casa", label: "Casa" },
+  { value: "Departamento", label: "Departamento" },
+  { value: "Oficina", label: "Oficina" },
+  { value: "Local comercial", label: "Local comercial" },
+  { value: "Bodega", label: "Bodega" },
+  { value: "Galpón", label: "Galpón" },
+  { value: "Parcela / Campo", label: "Parcela / Campo" },
+  { value: "Otro", label: "Otro" },
+];
 
 function buildShippingPayload(fields: {
   addressLine1: string;
@@ -53,13 +74,21 @@ function buildShippingPayload(fields: {
 }
 
 function buildProfilePayload(
-  contact: { name: string; phone: string; email: string },
+  contact: {
+    name: string;
+    phone: string | null;
+    email: string;
+    rut: string | null;
+    clienteTipo: ClienteTipo;
+  },
   shipping: ShippingInfo | null,
 ): ClienteShippingProfile {
   return {
     contactName: contact.name,
     phone: contact.phone,
     email: contact.email || null,
+    rut: contact.rut || null,
+    clienteTipo: contact.clienteTipo,
     addressLine1: shipping?.addressLine1 ?? null,
     addressLine2: shipping?.addressLine2 ?? null,
     city: shipping?.city ?? null,
@@ -73,22 +102,53 @@ interface ContactFormProps {
   formId?: string;
   hideSubmitButton?: boolean;
   onSuccess?: (requestId: string | null, whatsAppUrl?: string) => void;
+  onSubmittingChange?: (submitting: boolean) => void;
+  onErrorChange?: (error: string) => void;
 }
 
 export default function ContactForm({
   formId = "solicitud-cotizacion-form",
   hideSubmitButton = false,
   onSuccess,
+  onSubmittingChange,
+  onErrorChange,
 }: ContactFormProps) {
   const searchParams = useSearchParams();
   const productId = searchParams.get("producto");
   const { products, addProduct, clearProducts } = useQuoteSelection();
   const { user, loading: authLoading } = useFirebaseAuth();
+  const guestName = useGuestName();
   const profileLoadedRef = useRef(false);
+  /**
+   * Clave de idempotencia: se genera al primer intento de envío y se reutiliza
+   * si hay un error de red (reintento del mismo envío). Solo se regenera tras
+   * un envío exitoso, para evitar cotizaciones duplicadas desde la web.
+   */
+  const idempotencyRef = useRef<string | null>(null);
+  /**
+   * Guard síncrono de doble envío: `setIsSubmitting` es asíncrono (React
+   * batching), por lo que varios clics rápidos podrían disparar múltiples
+   * handleSubmit antes de que el botón se deshabilite. Este ref se marca y
+   * verifica de forma síncrona para bloquear los envíos concurrentes.
+   */
+  const submittingRef = useRef(false);
+
+  function obtenerClaveIdempotencia(): string {
+    if (!idempotencyRef.current) {
+      idempotencyRef.current =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `web-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    }
+    return idempotencyRef.current;
+  }
 
   const [name, setName] = useState("");
+  const [nameEdited, setNameEdited] = useState(false);
+  const [clienteTipo, setClienteTipo] = useState<ClienteTipo>("persona");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState<string | undefined>();
+  const [rut, setRut] = useState("");
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [city, setCity] = useState("");
@@ -97,8 +157,10 @@ export default function ContactForm({
   const [country, setCountry] = useState("Chile");
   const [message, setMessage] = useState("");
   const [saveProfileForFuture, setSaveProfileForFuture] = useState(false);
-  const [showShippingFields, setShowShippingFields] = useState(false);
+  const [nameError, setNameError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [rutError, setRutError] = useState("");
+  const [addressError, setAddressError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -135,22 +197,40 @@ export default function ContactForm({
         setName(user.displayName);
       }
 
+      if (
+        profile?.clienteTipo === "empresa" ||
+        profile?.clienteTipo === "persona"
+      ) {
+        setClienteTipo(profile.clienteTipo);
+      }
+
       if (profile?.phone) {
-        setPhone(profile.phone);
+        setPhone((prev) => prev || profile.phone || "");
       }
 
       if (profile?.email) {
-        setEmail(profile.email);
+        setEmail((prev) => prev || profile.email || "");
       } else if (user.email) {
-        setEmail(user.email);
+        setEmail((prev) => prev || user.email || "");
+      }
+
+      if (profile?.rut) {
+        setRut((prev) => prev || formatRut(profile.rut) || "");
       }
 
       if (profile?.addressLine1) {
         setAddressLine1(profile.addressLine1);
       }
 
-      if (profile?.addressLine2) {
+      if (
+        profile?.addressLine2 &&
+        PLACE_TYPE_OPTIONS.some(
+          (option) => option.value === profile.addressLine2,
+        )
+      ) {
         setAddressLine2(profile.addressLine2);
+      } else {
+        setAddressLine2("");
       }
 
       if (profile?.city) {
@@ -163,10 +243,8 @@ export default function ContactForm({
 
       if (profile?.postalCode) {
         setPostalCode(profile.postalCode);
-      }
-
-      if (profile?.country) {
-        setCountry(profile.country);
+      } else {
+        setPostalCode("");
       }
     });
   }, [authLoading, user]);
@@ -178,9 +256,13 @@ export default function ContactForm({
     }
   }, [user]);
 
-  const isPhoneValid = Boolean(phone && isValidPhoneNumber(phone));
   const googleEmail = user?.email?.trim() ?? "";
   const usesGoogleEmail = Boolean(googleEmail);
+  const effectiveName = !user && !nameEdited ? guestName : name;
+  const effectiveEmail = resolveSubmitEmail();
+  const emailIsValid = Boolean(
+    effectiveEmail && EMAIL_PATTERN.test(effectiveEmail),
+  );
 
   function resolveSubmitEmail(): string {
     const typedEmail = sanitizeText(email, 200) ?? "";
@@ -193,8 +275,11 @@ export default function ContactForm({
 
   function resetForm() {
     setName("");
+    setNameEdited(false);
+    setClienteTipo("persona");
     setEmail("");
     setPhone(undefined);
+    setRut("");
     setAddressLine1("");
     setAddressLine2("");
     setCity("");
@@ -203,29 +288,99 @@ export default function ContactForm({
     setCountry("Chile");
     setMessage("");
     setSaveProfileForFuture(false);
+    setNameError("");
+    setPhoneError("");
+    setRutError("");
+    setAddressError("");
+  }
+
+  function handleAddressChange(nextValue: string) {
+    setAddressLine1(nextValue);
+    setAddressError("");
+    setCity("");
+    setRegion("");
+    setPostalCode("");
+  }
+
+  function handleAddressSelect(selection: AddressSelection) {
+    setAddressLine1(selection.address);
+    setCity(selection.city ?? "");
+    setRegion(selection.region ?? "");
+    setPostalCode(selection.postalCode ?? "");
+
+    if (selection.country) {
+      setCountry(selection.country);
+    }
+
+    setAddressError("");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!phone || !isValidPhoneNumber(phone)) {
-      setPhoneError("Ingrese un número de teléfono válido.");
+    if (submittingRef.current) {
       return;
     }
 
-    setPhoneError("");
-    setSubmitError("");
-    setSubmitSuccess(false);
-    setRequestId(null);
-
-    const safeName = sanitizeText(name, 120, { required: true }) ?? "";
+    const safeName = sanitizeText(effectiveName, 120, { required: true }) ?? "";
     const safeMessage = sanitizeText(message, 1000) ?? "";
     const safeEmail = resolveSubmitEmail();
+    const safeRut = sanitizeText(rut, 20) ?? "";
 
-    if (!safeName) {
-      setSubmitError("Ingrese un nombre válido.");
+    setNameError("");
+    setPhoneError("");
+    setRutError("");
+    setAddressError("");
+    setSubmitError("");
+
+    if (!isValidClientName(safeName, clienteTipo)) {
+      const msg =
+        clienteTipo === "empresa"
+          ? "Ingrese una razón social válida (mínimo 3 caracteres)."
+          : "Ingrese su nombre completo (mínimo 3 letras).";
+      setNameError(msg);
+      onErrorChange?.(msg);
       return;
     }
+
+    if (!safeEmail || !EMAIL_PATTERN.test(safeEmail)) {
+      const msg = "Ingrese un correo electrónico válido.";
+      setSubmitError(msg);
+      onErrorChange?.(msg);
+      return;
+    }
+
+    if (!phone) {
+      const msg = "Ingrese su número de teléfono.";
+      setPhoneError(msg);
+      onErrorChange?.(msg);
+      return;
+    }
+
+    if (!isValidPhoneNumber(phone)) {
+      const msg = "Ingrese un número de teléfono válido.";
+      setPhoneError(msg);
+      onErrorChange?.(msg);
+      return;
+    }
+
+    if (safeRut && !validarRut(safeRut)) {
+      const msg = "Ingrese un RUT válido (ej: 12.345.678-9).";
+      setRutError(msg);
+      onErrorChange?.(msg);
+      return;
+    }
+
+    if (!addressLine1.trim()) {
+      const msg = "Ingrese su dirección.";
+      setAddressError(msg);
+      onErrorChange?.(msg);
+      return;
+    }
+
+    onErrorChange?.("");
+    setSubmitSuccess(false);
+    setRequestId(null);
 
     const shipping = buildShippingPayload({
       addressLine1,
@@ -236,7 +391,9 @@ export default function ContactForm({
       country,
     });
 
+    submittingRef.current = true;
     setIsSubmitting(true);
+    onSubmittingChange?.(true);
 
     try {
       const response = await fetch("/api/cotizaciones/solicitudes", {
@@ -244,21 +401,27 @@ export default function ContactForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: safeName,
+          clienteTipo,
           phone,
+          rut: safeRut || undefined,
           email: safeEmail || undefined,
           message: safeMessage || undefined,
           clientUserId: user?.uid,
+          idempotencyKey: obtenerClaveIdempotencia(),
           shipping: shipping ?? undefined,
           products: products.map((product) => ({
             id: product.id,
             name: product.name,
             capacity: product.capacity,
+            quantity: product.quantity ?? 1,
             selectedColor: product.selectedColor ?? undefined,
             selectedColorId: product.selectedColorId ?? undefined,
             selectedAddOns: product.selectedAddOns?.map((addOn) => ({
               id: addOn.id,
               name: addOn.name,
             })),
+            variacionId: product.variacionId ?? undefined,
+            variacionName: product.variacionName ?? undefined,
           })),
         }),
       });
@@ -271,18 +434,29 @@ export default function ContactForm({
       };
 
       if (!response.ok) {
-        setSubmitError(
+        const msg =
           data.error ??
-            "No se pudo enviar la solicitud. Intente de nuevo en unos minutos.",
-        );
+          "No se pudo enviar la solicitud. Intente de nuevo en unos minutos.";
+        setSubmitError(msg);
+        onErrorChange?.(msg);
         return;
+      }
+
+      if (!user) {
+        saveGuestName(safeName);
       }
 
       if (user && saveProfileForFuture) {
         await saveClienteShippingProfile(
           user,
           buildProfilePayload(
-            { name: safeName, phone, email: safeEmail || googleEmail },
+            {
+              name: safeName,
+              phone: phone ?? null,
+              email: safeEmail || googleEmail,
+              rut: safeRut || null,
+              clienteTipo,
+            },
             shipping,
           ),
         );
@@ -291,6 +465,7 @@ export default function ContactForm({
       const submittedProducts = products.map((product) => ({
         name: product.name,
         capacity: product.capacity,
+        quantity: product.quantity ?? 1,
         selectedColor: product.selectedColor ?? undefined,
         selectedColorId: product.selectedColorId ?? undefined,
         selectedAddOns: product.selectedAddOns?.map((addOn) => ({
@@ -303,12 +478,14 @@ export default function ContactForm({
 
       const waUrl = buildQuoteWhatsAppUrl(
         safeName,
-        phone,
+        phone ?? "",
         safeMessage,
         submittedProducts,
         {
           requestId: submittedRequestId ?? undefined,
           email: safeEmail || undefined,
+          rut: safeRut || undefined,
+          clienteTipo,
         },
       );
 
@@ -318,37 +495,33 @@ export default function ContactForm({
       if (onSuccess) {
         onSuccess(submittedRequestId, waUrl);
       }
+      // Envío exitoso: la próxima cotización usará una clave nueva.
+      idempotencyRef.current = null;
       resetForm();
       clearProducts();
     } catch {
-      setSubmitError(
-        "No se pudo conectar con el servidor. Verifique su conexión e intente de nuevo.",
-      );
+      const msg =
+        "No se pudo conectar con el servidor. Verifique su conexión e intente de nuevo.";
+      setSubmitError(msg);
+      onErrorChange?.(msg);
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
+      onSubmittingChange?.(false);
     }
   }
 
-  const introText = (
-    <>
-      Complete sus datos y el equipo recibirá su solicitud al instante para
-      preparar la cotización.
-      {products.length === 0 && " También puede agregar productos desde el catálogo."}
-    </>
-  );
-
-  const shippingFilled = hasShippingInfo({
-    addressLine1: addressLine1 || null,
-    addressLine2: addressLine2 || null,
-    city: city || null,
-    region: region || null,
-    postalCode: postalCode || null,
-    country: country || null,
-  });
+  const canSubmit =
+    isValidClientName(effectiveName, clienteTipo) &&
+    emailIsValid &&
+    Boolean(phone) &&
+    Boolean(addressLine1.trim()) &&
+    (!rut.trim() || validarRut(rut)) &&
+    !isSubmitting;
 
   if (submitSuccess) {
     return (
-      <section className="mx-auto w-full rounded-lg border border-white/[0.06] bg-panel/40 px-4 py-8 sm:px-6">
+      <section className="mx-auto w-full rounded-2xl border border-white/[0.08] bg-panel/40 px-4 py-8 sm:px-6">
         <QuoteSentAnimation
           requestId={requestId}
           whatsAppUrl={whatsAppUrl}
@@ -363,16 +536,14 @@ export default function ContactForm({
   }
 
   return (
-    <section className="min-w-0 w-full rounded-2xl border border-white/[0.08] bg-panel p-6 sm:p-8 shadow-xl shadow-black/30">
-      <div className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-4">
-        <div>
-          <h2 className="font-display text-2xl uppercase tracking-wide text-steel-light">
-            Datos de Solicitud
-          </h2>
-          <p className="mt-1 text-xs text-steel-mid">
-            Complete sus datos para recibir la propuesta comercial oficial.
-          </p>
-        </div>
+    <section className="min-w-0 w-full rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-7">
+      <div className="mb-6 border-b border-white/[0.06] pb-3">
+        <h3 className="text-base font-semibold text-white">
+          Información del contacto
+        </h3>
+        <p className="mt-0.5 text-xs text-steel-dark">
+          Completa tus datos para enviarte la propuesta formal.
+        </p>
       </div>
 
       <form
@@ -384,201 +555,190 @@ export default function ContactForm({
         <fieldset className="min-w-0 w-full space-y-6">
           <legend className="sr-only">Datos de contacto</legend>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <div>
-              <label htmlFor="name" className={fieldLabelClass}>
-                Nombre Completo *
-              </label>
-              <input
-                id="name"
-                type="text"
-                required
-                maxLength={120}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Su nombre completo"
-                className="industrial-input max-md:min-h-12 max-md:text-base"
+          <div>
+            <span className={fieldLabelClass}>Tipo de cliente</span>
+            <div
+              role="radiogroup"
+              aria-label="Tipo de cliente"
+              className="relative grid w-full grid-cols-2 rounded-xl border border-white/[0.08] bg-white/[0.02] p-1 sm:w-[18rem]"
+            >
+              <span
+                aria-hidden
+                className={`pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-lg bg-orange transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+                  clienteTipo === "empresa" ? "translate-x-full" : "translate-x-0"
+                }`}
               />
-            </div>
+              {(
+                [
+                  { value: "persona", label: "Particular", icon: User },
+                  { value: "empresa", label: "Empresa", icon: Building2 },
+                ] as const
+              ).map(({ value, label, icon: Icon }) => {
+                const active = clienteTipo === value;
 
-            <div className="min-w-0">
-              <label htmlFor="phone" className={fieldLabelClass}>
-                WhatsApp / Teléfono *
-              </label>
-              <div className="min-w-0 w-full">
-                <PhoneInput
-                  id="phone"
-                  defaultCountry="CL"
-                  countries={AMERICA_COUNTRIES}
-                  labels={es}
-                  flags={flags}
-                  countrySelectComponent={PhoneCountrySelect}
-                  placeholder="912345678"
-                  value={phone}
-                  onChange={setPhone}
-                  className="phone-input-wrapper"
-                />
-              </div>
-              {phoneError ? (
-                <p className="mt-1.5 text-xs text-orange">{phoneError}</p>
-              ) : null}
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => {
+                      setClienteTipo(value);
+                      setNameError("");
+                    }}
+                    className={`relative z-10 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange ${
+                      active ? "text-white" : "text-steel-mid hover:text-white"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           <div>
-            <label htmlFor="email" className={fieldLabelClass}>
-              Correo Electrónico{" "}
-              <span className="text-steel-dark">(opcional)</span>
+            <label htmlFor="name" className={fieldLabelClass}>
+              {clienteTipo === "empresa" ? "Razón Social *" : "Nombre Completo *"}
             </label>
             <input
-              id="email"
-              type="email"
-              maxLength={200}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="correo@ejemplo.com"
-              className="industrial-input max-md:min-h-12 max-md:text-base"
+              id="name"
+              type="text"
+              required
+              maxLength={120}
+              autoComplete="name"
+              value={effectiveName}
+              onChange={(e) => {
+                setNameEdited(true);
+                setName(e.target.value);
+                setNameError("");
+              }}
+              placeholder={
+                clienteTipo === "empresa"
+                  ? "Ej: Tostadores Fica SpA"
+                  : "Su nombre completo"
+              }
+              aria-invalid={Boolean(nameError)}
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5 text-sm text-steel-light placeholder:text-steel-dark focus:border-orange/60 focus:outline-none focus:ring-1 focus:ring-orange/30"
             />
-            {usesGoogleEmail ? (
-              <p className="mt-1.5 text-xs text-steel-dark">
-                Autocompletado desde tu cuenta. Puedes editarlo si lo necesitas.
-              </p>
+            {nameError ? (
+              <p className="mt-1.5 text-xs text-orange">{nameError}</p>
             ) : null}
+          </div>
+
+          <div className="min-w-0">
+            <label htmlFor="phone" className={fieldLabelClass}>
+              WhatsApp / Teléfono *
+            </label>
+            <div className="min-w-0 w-full">
+              <PhoneInput
+                id="phone"
+                defaultCountry="CL"
+                placeholder="912345678"
+                value={phone}
+                onChange={(value) => {
+                  setPhone(value);
+                  setPhoneError("");
+                }}
+                countrySelectComponent={PhoneCountrySelectHidden}
+                className="phone-input-wrapper"
+              />
+            </div>
+            <DetectedPhoneCountry value={phone} />
+            {phoneError ? (
+              <p className="mt-1.5 text-xs text-orange">{phoneError}</p>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div>
+              <label htmlFor="email" className={fieldLabelClass}>
+                Correo Electrónico *
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                maxLength={200}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="correo@ejemplo.com"
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5 text-sm text-steel-light placeholder:text-steel-dark focus:border-orange/60 focus:outline-none focus:ring-1 focus:ring-orange/30"
+              />
+              {usesGoogleEmail ? (
+                <p className="mt-1.5 text-xs text-steel-dark">
+                  Autocompletado desde tu cuenta. Puedes editarlo si lo necesitas.
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label htmlFor="rut" className={fieldLabelClass}>
+                RUT <span className="text-steel-dark">(opcional)</span>
+              </label>
+              <input
+                id="rut"
+                type="text"
+                maxLength={20}
+                autoComplete="off"
+                value={rut}
+                onChange={(e) => {
+                  setRut(formatRut(e.target.value));
+                  setRutError("");
+                }}
+                placeholder="12.345.678-9"
+                aria-invalid={Boolean(rutError)}
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5 text-sm text-steel-light placeholder:text-steel-dark focus:border-orange/60 focus:outline-none focus:ring-1 focus:ring-orange/30"
+              />
+              {rutError ? (
+                <p className="mt-1.5 text-xs text-orange">{rutError}</p>
+              ) : null}
+            </div>
           </div>
         </fieldset>
 
-        {/* Optional Shipping Address Accordion / Toggle with Smooth Animation */}
+        {/* Dirección de despacho o entrega (obligatoria) */}
         <div className="border-t border-white/[0.06] pt-6">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setShowShippingFields((prev) => !prev)}
-              className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-orange hover:underline focus:outline-none transition-colors"
-              aria-expanded={showShippingFields}
-            >
-              {showShippingFields
-                ? "− Ocultar datos de despacho"
-                : "+ Agregar dirección de despacho o entrega (Opcional)"}
-            </button>
-          </div>
-
-          <div
-            className={`grid transition-all duration-300 ease-in-out ${
-              showShippingFields
-                ? "grid-rows-[1fr] opacity-100 mt-4"
-                : "grid-rows-[0fr] opacity-0"
-            }`}
-            style={{ transitionProperty: "grid-template-rows, opacity, margin-top" }}
-          >
-            <div className="min-h-0 overflow-hidden">
-              <fieldset className="min-w-0 w-full space-y-6 pt-2">
-                <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                  <legend className="font-display text-base uppercase tracking-wide text-steel-light">
-                    Datos de Envío y Despacho
-                  </legend>
-                  <span className="text-[11px] text-steel-dark font-normal">
-                    (Dirección de entrega de la maquinaria)
-                  </span>
-                </div>
-
-                <div>
-                  <label htmlFor="addressLine1" className={fieldLabelClass}>
-                    Calle y número
-                  </label>
-                  <input
-                    id="addressLine1"
-                    type="text"
-                    maxLength={200}
-                    value={addressLine1}
-                    onChange={(e) => setAddressLine1(e.target.value)}
-                    placeholder="Av. Principal 1234"
-                    className="industrial-input max-md:min-h-12 max-md:text-base"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="addressLine2" className={fieldLabelClass}>
-                    Depto / block / referencia{" "}
-                    <span className="text-steel-dark">(opcional)</span>
-                  </label>
-                  <input
-                    id="addressLine2"
-                    type="text"
-                    maxLength={120}
-                    value={addressLine2}
-                    onChange={(e) => setAddressLine2(e.target.value)}
-                    placeholder="Depto 502, bodega 3, etc."
-                    className="industrial-input max-md:min-h-12 max-md:text-base"
-                  />
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="city" className={fieldLabelClass}>
-                      Comuna / Ciudad
-                    </label>
-                    <input
-                      id="city"
-                      type="text"
-                      maxLength={80}
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      placeholder="Temuco"
-                      className="industrial-input max-md:min-h-12 max-md:text-base"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="region" className={fieldLabelClass}>
-                      Región
-                    </label>
-                    <input
-                      id="region"
-                      type="text"
-                      maxLength={80}
-                      value={region}
-                      onChange={(e) => setRegion(e.target.value)}
-                      placeholder="Araucanía"
-                      className="industrial-input max-md:min-h-12 max-md:text-base"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="postalCode" className={fieldLabelClass}>
-                      Código postal{" "}
-                      <span className="text-steel-dark">(opcional)</span>
-                    </label>
-                    <input
-                      id="postalCode"
-                      type="text"
-                      maxLength={20}
-                      value={postalCode}
-                      onChange={(e) => setPostalCode(e.target.value)}
-                      placeholder="4780000"
-                      className="industrial-input max-md:min-h-12 max-md:text-base"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="country" className={fieldLabelClass}>
-                      País
-                    </label>
-                    <input
-                      id="country"
-                      type="text"
-                      maxLength={80}
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      placeholder="Chile"
-                      className="industrial-input max-md:min-h-12 max-md:text-base"
-                    />
-                  </div>
-                </div>
-              </fieldset>
+          <fieldset className="min-w-0 w-full space-y-4">
+            <div className="border-b border-white/[0.06] pb-3">
+              <legend className="text-sm font-medium text-steel-mid">
+                Dirección de despacho o entrega
+              </legend>
             </div>
-          </div>
+
+            <div>
+              <label htmlFor="addressLine1" className={fieldLabelClass}>
+                Dirección *
+              </label>
+              <AddressField
+                id="addressLine1"
+                value={addressLine1}
+                onChange={handleAddressChange}
+                onSelect={handleAddressSelect}
+                error={addressError}
+                placeholder="Calle, número, comuna, región"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="addressLine2" className={fieldLabelClass}>
+                Tipo de lugar <span className="text-steel-dark">(opcional)</span>
+              </label>
+              <CustomSelect
+                id="addressLine2"
+                value={addressLine2}
+                onChange={setAddressLine2}
+                options={PLACE_TYPE_OPTIONS}
+                placeholder="Casa, departamento, bodega…"
+                aria-label="Tipo de lugar"
+              />
+            </div>
+
+            {addressError ? (
+              <p className="text-xs text-orange">{addressError}</p>
+            ) : null}
+          </fieldset>
         </div>
 
         {/* Message / Specifications */}
@@ -594,10 +754,10 @@ export default function ContactForm({
             onChange={(e) => setMessage(e.target.value)}
             placeholder={
               products.length > 0
-                ? "Escriba aquí dudas sobre voltaje, instalación o requerimientos especiales de su proyecto..."
+                ? "Dudas sobre voltaje, instalación o requerimientos especiales..."
                 : "Cuéntenos qué equipo necesita o su consulta..."
             }
-            className="industrial-input max-md:min-h-20 max-md:text-base resize-y"
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5 text-sm text-steel-light placeholder:text-steel-dark focus:border-orange/60 focus:outline-none focus:ring-1 focus:ring-orange/30 min-h-[5rem] resize-y"
           />
         </div>
 
@@ -608,8 +768,8 @@ export default function ContactForm({
         {!hideSubmitButton && (
           <button
             type="submit"
-            disabled={!name || !isPhoneValid || isSubmitting}
-            className="min-h-12 w-full rounded-xl bg-orange py-3.5 text-sm font-semibold uppercase tracking-wider text-white transition-all hover:bg-orange-hover shadow-lg shadow-orange/20 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canSubmit}
+            className="min-h-12 w-full rounded-md bg-orange py-3 text-sm font-medium text-white transition-colors hover:bg-orange-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? "Enviando..." : "Enviar Solicitud"}
           </button>

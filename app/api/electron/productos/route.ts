@@ -5,10 +5,19 @@ import {
 } from "@/lib/electron-presence";
 import { electronJson, electronOptionsResponse } from "@/lib/electron-cors";
 import { getFirebaseAdminFirestore } from "@/lib/firebase-admin";
-import { PRODUCTOS_COLLECTION } from "@/lib/catalog/constants";
+import {
+  PRODUCTOS_COLLECTION,
+  PRODUCTOS_PRECIOS_COLLECTION,
+} from "@/lib/catalog/constants";
+import {
+  extractPricesFromProduct,
+  hasProductPrices,
+  stripProductPrices,
+} from "@/lib/catalog/product-prices";
 import { FieldValue } from "firebase-admin/firestore";
 import { revalidateProductPages } from "@/lib/revalidate-products";
 import { slugifyProductId } from "@/lib/product-utils";
+import { sanitizeTechnicalDetails } from "@/lib/technical-details";
 
 /**
  * POST /api/electron/productos
@@ -28,14 +37,10 @@ const TEXT_FIELDS: Record<string, number> = {
   modelo: 120,
   serie: 120,
   catalog: 120,
-  catalogo: 120,
   category: 120,
-  categoria: 120,
   capacity: 120,
   description: 500,
   longDescription: 5000,
-  promoTag: 100,
-  promoDescription: 300,
 };
 
 const STRING_ARRAY_FIELDS = ["specs", "features", "disabledColors"] as const;
@@ -43,11 +48,25 @@ const STRING_ARRAY_FIELDS = ["specs", "features", "disabledColors"] as const;
 const BOOLEAN_FIELDS = [
   "isOutOfStock",
   "disableColors",
-  "isPromo",
   "isFeatured",
 ] as const;
 
-const PRICE_FIELDS = ["listPrice", "price", "precio"] as const;
+const PRICE_FIELDS = ["listPrice", "priceUsd"] as const;
+
+function migrateLegacyFields(body: Record<string, unknown>): void {
+  if (body["catalog"] === undefined && body["catalogo"] !== undefined) {
+    body["catalog"] = body["catalogo"];
+  }
+  if (body["category"] === undefined && body["categoria"] !== undefined) {
+    body["category"] = body["categoria"];
+  }
+  if (body["listPrice"] === undefined) {
+    body["listPrice"] = body["price"] ?? body["precio"];
+  }
+  if (body["priceUsd"] === undefined) {
+    body["priceUsd"] = body["listPriceUsd"] ?? body["precioUsd"];
+  }
+}
 
 function cleanPrice(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -64,6 +83,41 @@ function cleanText(value: unknown, max: number): string | null {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) return null;
   return text.slice(0, max);
+}
+
+function cleanVariaciones(value: unknown): { id: string; name: string; description?: string; price?: number; priceUsd?: number }[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const variaciones: { id: string; name: string; description?: string; price?: number; priceUsd?: number }[] = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const name = cleanText(record.name, 120);
+    if (!name) continue;
+
+    const rawId = cleanText(record.id, 80);
+    const id = rawId && slugifyProductId(rawId) ? rawId : slugifyProductId(name);
+    if (!id) continue;
+
+    const description = cleanText(record.description, 300) ?? undefined;
+    const price = cleanPrice(record.price);
+    const priceUsdRaw = cleanPrice(record.priceUsd);
+    const priceUsd =
+      priceUsdRaw !== null ? Math.round(priceUsdRaw * 100) / 100 : null;
+
+    variaciones.push({
+      id,
+      name,
+      ...(description ? { description } : {}),
+      ...(price !== null && price > 0 ? { price } : {}),
+      ...(priceUsd !== null && priceUsd > 0 ? { priceUsd } : {}),
+    });
+  }
+
+  return variaciones.slice(0, 20);
 }
 
 export function OPTIONS() {
@@ -96,6 +150,8 @@ export async function POST(request: Request) {
   } catch {
     return electronJson({ error: "Cuerpo JSON inválido." }, { status: 400 });
   }
+
+  migrateLegacyFields(body);
 
   const name = cleanText(body["name"], 160);
 
@@ -140,6 +196,25 @@ export async function POST(request: Request) {
     if (price !== null) product[field] = price;
   }
 
+  // Detalles técnicos (Rendimiento, Sacos, etc.) desde el importador de precios.
+  if (body["technicalDetails"] !== undefined) {
+    product["technicalDetails"] = sanitizeTechnicalDetails(
+      body["technicalDetails"],
+    );
+  }
+
+  // Variaciones (versiones del mismo equipo con precio distinto, ej. con/sin software).
+  if (body["variaciones"] !== undefined) {
+    const variaciones = cleanVariaciones(body["variaciones"]);
+    if (variaciones === null) {
+      return electronJson(
+        { error: "El campo variaciones debe ser una lista de variaciones." },
+        { status: 400 },
+      );
+    }
+    product["variaciones"] = variaciones;
+  }
+
   // Imágenes (desde el editor de la app de escritorio).
   if (body["images"] !== undefined) {
     if (!Array.isArray(body["images"])) {
@@ -166,9 +241,33 @@ export async function POST(request: Request) {
 
         if (!carouselSrc && !productViewSrc) return null;
 
+        const readFocus = (view: Record<string, unknown> | null) => {
+          if (!view || typeof view.focus !== "object" || view.focus === null) {
+            return undefined;
+          }
+          const f = view.focus as Record<string, unknown>;
+          const x = Number(f.x);
+          const y = Number(f.y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
+          return {
+            x: Math.min(100, Math.max(0, Math.round(x))),
+            y: Math.min(100, Math.max(0, Math.round(y))),
+          };
+        };
+
         return {
-          carousel: { src: carouselSrc ?? productViewSrc! },
-          product: { src: productViewSrc ?? carouselSrc! },
+          carousel: {
+            src: carouselSrc ?? productViewSrc!,
+            ...(readFocus(record.carousel as Record<string, unknown> | null)
+              ? { focus: readFocus(record.carousel as Record<string, unknown> | null) }
+              : {}),
+          },
+          product: {
+            src: productViewSrc ?? carouselSrc!,
+            ...(readFocus(record.product as Record<string, unknown> | null)
+              ? { focus: readFocus(record.product as Record<string, unknown> | null) }
+              : {}),
+          },
         };
       })
       .filter(Boolean)
@@ -210,12 +309,26 @@ export async function POST(request: Request) {
       );
     }
 
-    await ref.set({
-      ...product,
+    const prices = extractPricesFromProduct(product);
+    const sanitized = stripProductPrices(product);
+    const batch = db.batch();
+
+    batch.set(ref, {
+      ...sanitized,
       id,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    if (hasProductPrices(prices)) {
+      batch.set(
+        db.collection(PRODUCTOS_PRECIOS_COLLECTION).doc(id),
+        { ...prices, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+    }
+
+    await batch.commit();
 
     revalidateProductPages(id);
 

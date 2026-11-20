@@ -1,0 +1,20 @@
+import { expect, it, vi } from "vitest";
+vi.mock("@/lib/cotizaciones/repository", () => ({ createSolicitudCotizacion: vi.fn(async () => ({ id: "CT1" })), CotizacionesRepositoryError: class extends Error {} }));
+vi.mock("@/lib/soporte-tecnico/repository", () => ({ createSolicitudSoporteTecnico: vi.fn(async () => ({ id: "S1" })), SoporteTecnicoRepositoryError: class extends Error {} }));
+vi.mock("@/lib/validation/cotizacion-input", () => ({ parseCreateSolicitudCotizacionInput: () => ({ name: "Cliente", products: [] }) }));
+vi.mock("@/lib/validation/soporte-tecnico-input", () => ({ parseCreateSolicitudSoporteTecnicoInput: () => ({ name: "Cliente", issueCategory: "Revisión" }) }));
+vi.mock("@/lib/validation/parse-request", () => ({ parseJsonBody: async () => ({}), validationErrorResponse: vi.fn() }));
+vi.mock("@/lib/fcm", () => ({ enviarNotificacionNuevaSolicitud: vi.fn() }));
+import { enviarNotificacionNuevaSolicitud } from "@/lib/fcm";
+import { POST as quote } from "@/app/api/cotizaciones/solicitudes/route";
+import { POST as support } from "@/app/api/soporte-tecnico/solicitudes/route";
+it.each([["quote", quote], ["support", support]] as const)("waits for push delivery before completing %s response", async (_name, post) => {
+  let finish!: () => void;
+  vi.mocked(enviarNotificacionNuevaSolicitud).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  let complete = false;
+  const response = post(new Request("http://localhost", { method: "POST" })).then(value => { complete = true; return value; });
+  await vi.waitFor(() => expect(finish).toBeDefined());
+  expect(complete).toBe(false);
+  finish();
+  expect((await response).status).toBe(201);
+});

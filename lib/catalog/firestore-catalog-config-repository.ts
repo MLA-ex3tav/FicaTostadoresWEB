@@ -7,9 +7,27 @@ import {
   getFirebaseAdminFirestore,
   isFirebaseAdminConfigured,
 } from "@/lib/firebase-admin";
-import type { CatalogConfig } from "@/lib/catalog-config";
+import { isLocalDevMode } from "@/lib/local-dev/mode";
+import {
+  readLocalJson,
+  writeLocalJson,
+} from "@/lib/local-dev/server-data";
+import { defaultCatalogConfig, type CatalogConfig } from "@/lib/catalog-config";
+
+const LOCAL_CATALOG_CONFIG_FILE = "catalog-config.json";
+
+async function readLocalCatalogConfig(): Promise<CatalogConfig> {
+  return readLocalJson<CatalogConfig>(
+    LOCAL_CATALOG_CONFIG_FILE,
+    () => defaultCatalogConfig,
+  );
+}
 
 export async function readCatalogConfigFromFirestore(): Promise<CatalogConfig | null> {
+  if (isLocalDevMode()) {
+    return readLocalCatalogConfig();
+  }
+
   if (!isFirebaseAdminConfigured()) {
     return null;
   }
@@ -47,6 +65,11 @@ export async function readCatalogConfigFromFirestore(): Promise<CatalogConfig | 
 export async function writeCatalogConfigToFirestore(
   config: CatalogConfig,
 ): Promise<void> {
+  if (isLocalDevMode()) {
+    await writeLocalJson(LOCAL_CATALOG_CONFIG_FILE, config);
+    return;
+  }
+
   if (!isFirebaseAdminConfigured()) {
     throw new Error("Firebase Admin no está configurado.");
   }
@@ -66,6 +89,10 @@ export async function writeCatalogConfigToFirestore(
 }
 
 export async function hasCatalogConfigInFirestore(): Promise<boolean> {
+  if (isLocalDevMode()) {
+    return true;
+  }
+
   if (!isFirebaseAdminConfigured()) {
     return false;
   }

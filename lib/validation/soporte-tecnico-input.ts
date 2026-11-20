@@ -13,6 +13,8 @@ export interface CreateSolicitudSoporteTecnicoInput {
   equipmentLocation: string | null;
   clientUserId: string | null;
   clientCountry: string | null;
+  /** Clave de idempotencia generada por el cliente (evita duplicados por reintento). */
+  idempotencyKey: string | null;
 }
 
 export function parseCreateSolicitudSoporteTecnicoInput(
@@ -66,6 +68,12 @@ export function parseCreateSolicitudSoporteTecnicoInput(
       ? clientUserIdRaw
       : null;
 
+  const idempotencyKeyRaw = sanitizeText(record.idempotencyKey, 128);
+  const idempotencyKey =
+    idempotencyKeyRaw && /^[a-zA-Z0-9_-]{8,128}$/.test(idempotencyKeyRaw)
+      ? idempotencyKeyRaw
+      : null;
+
   return {
     name,
     phone: parsedPhone.format("E.164"),
@@ -77,5 +85,6 @@ export function parseCreateSolicitudSoporteTecnicoInput(
     equipmentLocation,
     clientUserId,
     clientCountry: parsedPhone.country ?? null,
+    idempotencyKey,
   };
 }
